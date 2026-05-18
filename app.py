@@ -82,6 +82,7 @@ with col_load:
             st.session_state.logo_image = loaded.get("logo_image")
             st.session_state["main_copy"] = loaded.get("main_copy", "")
             st.session_state["sub_copy"] = loaded.get("sub_copy", "")
+            st.session_state["tmpl_select"] = template_label_map()[loaded["template"]]
             _sync_sliders(loaded["layers"])
             st.rerun()
 
