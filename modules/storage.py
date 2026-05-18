@@ -31,13 +31,13 @@ def load_project(name: str) -> dict:
     data = json.loads(json_path.read_text(encoding="utf-8"))
 
     if "product_image_path" in data:
-        path = Path(data["product_image_path"])
+        path = Path(data.pop("product_image_path"))
         data["product_image"] = Image.open(path).convert("RGBA") if path.exists() else None
     else:
         data["product_image"] = None
 
     if "logo_image_path" in data:
-        path = Path(data["logo_image_path"])
+        path = Path(data.pop("logo_image_path"))
         data["logo_image"] = Image.open(path).convert("RGBA") if path.exists() else None
     else:
         data["logo_image"] = None

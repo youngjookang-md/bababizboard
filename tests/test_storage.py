@@ -76,3 +76,24 @@ def test_save_with_product_image(tmp_projects):
     }
     save_project(state)
     assert (tmp_projects / "with_image" / "product.png").exists()
+
+def test_load_project_no_path_keys_in_result(tmp_projects):
+    img = Image.new("RGBA", (100, 100), (255, 0, 0, 255))
+    state = {
+        "name": "no_path_keys",
+        "template": "left_image",
+        "main_copy": "",
+        "sub_copy": "",
+        "layers": {
+            "product": {"x": 20, "y": 20, "scale": 75},
+            "logo":    {"x": 830, "y": 10, "scale": 20},
+            "main_text": {"x": 440, "y": 70},
+            "sub_text":  {"x": 440, "y": 145},
+        },
+        "product_image": img,
+        "logo_image": None,
+    }
+    save_project(state)
+    loaded = load_project("no_path_keys")
+    assert "product_image_path" not in loaded
+    assert "logo_image_path" not in loaded
