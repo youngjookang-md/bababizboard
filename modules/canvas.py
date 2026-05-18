@@ -18,10 +18,10 @@ SUB_COPY_COLOR = (119, 119, 119)    # #777777
 def _load_font(path: Path, size: int) -> ImageFont.FreeTypeFont:
     if path.exists():
         return ImageFont.truetype(str(path), size)
-    return ImageFont.load_default()
+    return ImageFont.load_default(size=size)
 
 
-def _paste_image(canvas: Image.Image, layer: Image.Image, x: int, y: int, scale: int) -> None:
+def _paste_image(canvas: Image.Image, layer: Image.Image | None, x: int, y: int, scale: int) -> None:
     if layer is None:
         return
     new_w = max(1, int(layer.width * scale / 100))
