@@ -19,8 +19,8 @@ def _base_state(name="test_project", product_images=None, logo_image=None):
         "sub_copy": "반가워",
         "layers": {
             "logo": {"x": 20, "y": 15, "scale": 20},
-            "main_text": {"x": 520, "y": 200},
-            "sub_text": {"x": 520, "y": 330},
+            "main_text": {"x": 520, "y": 200, "size": 48},
+            "sub_text": {"x": 520, "y": 330, "size": 39},
             "products": [],
         },
         "product_images": product_images or [],

@@ -5,7 +5,7 @@ def render_controls(layers: dict, num_products: int) -> dict:
     """Render layer adjustment sliders in sidebar. Returns updated layers dict."""
     updated = dict(layers)
 
-    # Logo — narrow range (Option A: top-left area only)
+    # Logo — narrow range (top-left area)
     with st.sidebar.expander("🖼 로고 위치", expanded=False):
         updated["logo"] = {
             "x": st.slider("로고 X", 0, 200, layers["logo"]["x"], key="logo_x"),
@@ -16,30 +16,32 @@ def render_controls(layers: dict, num_products: int) -> dict:
     # Product images — one expander per image
     product_layers = list(layers.get("products", []))
     for i in range(num_products):
-        defaults = product_layers[i] if i < len(product_layers) else {"x": 30, "y": 50, "scale": 75}
+        defaults = product_layers[i] if i < len(product_layers) else {"x": 600, "y": 10, "scale": 80}
         with st.sidebar.expander(f"📷 상품 이미지 {i + 1} 위치", expanded=(i == 0)):
-            product_layers_item = {
-                "x": st.slider(f"이미지{i+1} X", 0, 1100, defaults["x"], key=f"prod_x_{i}"),
-                "y": st.slider(f"이미지{i+1} Y", 0, 550, defaults["y"], key=f"prod_y_{i}"),
+            item = {
+                "x": st.slider(f"이미지{i+1} X", 0, 950, defaults["x"], key=f"prod_x_{i}"),
+                "y": st.slider(f"이미지{i+1} Y", 0, 230, defaults["y"], key=f"prod_y_{i}"),
                 "scale": st.slider(f"이미지{i+1} 크기(%)", 10, 200, defaults["scale"], key=f"prod_scale_{i}"),
             }
             if i < len(product_layers):
-                product_layers[i] = product_layers_item
+                product_layers[i] = item
             else:
-                product_layers.append(product_layers_item)
+                product_layers.append(item)
     updated["products"] = product_layers
 
-    # Text positions
-    with st.sidebar.expander("✏️ 메인 카피 위치", expanded=False):
+    # Text positions + font sizes
+    with st.sidebar.expander("✏️ 메인 카피", expanded=False):
         updated["main_text"] = {
-            "x": st.slider("메인카피 X", 0, 1100, layers["main_text"]["x"], key="main_x"),
-            "y": st.slider("메인카피 Y", 0, 500, layers["main_text"]["y"], key="main_y"),
+            "x": st.slider("메인 X", 0, 950, layers["main_text"]["x"], key="main_x"),
+            "y": st.slider("메인 Y", 0, 200, layers["main_text"]["y"], key="main_y"),
+            "size": st.slider("메인 크기(pt)", 20, 100, layers["main_text"].get("size", 48), key="main_size"),
         }
 
-    with st.sidebar.expander("✏️ 서브 카피 위치", expanded=False):
+    with st.sidebar.expander("✏️ 서브 카피", expanded=False):
         updated["sub_text"] = {
-            "x": st.slider("서브카피 X", 0, 1100, layers["sub_text"]["x"], key="sub_x"),
-            "y": st.slider("서브카피 Y", 0, 500, layers["sub_text"]["y"], key="sub_y"),
+            "x": st.slider("서브 X", 0, 950, layers["sub_text"]["x"], key="sub_x"),
+            "y": st.slider("서브 Y", 0, 220, layers["sub_text"]["y"], key="sub_y"),
+            "size": st.slider("서브 크기(pt)", 14, 70, layers["sub_text"].get("size", 39), key="sub_size"),
         }
 
     return updated
