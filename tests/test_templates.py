@@ -6,8 +6,12 @@ def test_template_names_has_three():
     assert len(TEMPLATE_NAMES) == 3
 
 
-def test_left_image_template_keys():
-    t = get_template("left_image")
+def test_right_image_is_first_template():
+    assert TEMPLATE_NAMES[0] == "right_image"
+
+
+def test_template_keys():
+    t = get_template("right_image")
     for layer in ("logo", "main_text", "sub_text", "default_product"):
         assert layer in t
 
@@ -20,6 +24,12 @@ def test_right_image_product_x_is_right_side():
 def test_text_focus_main_text_x_is_left():
     t = get_template("text_focus")
     assert t["main_text"]["x"] < 300
+
+
+def test_main_text_has_size_key():
+    t = get_template("right_image")
+    assert "size" in t["main_text"]
+    assert "size" in t["sub_text"]
 
 
 def test_invalid_template_raises():

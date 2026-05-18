@@ -2,22 +2,21 @@ from pathlib import Path
 from typing import Optional
 from PIL import Image, ImageDraw, ImageFont
 
-CANVAS_W = 1200
-CANVAS_H = 600
+CANVAS_W = 1029
+CANVAS_H = 258
 BG_COLOR = (255, 255, 255)
 
 _FONT_DIR = Path(__file__).parent.parent / "assets" / "fonts"
 _FONT_BOLD = _FONT_DIR / "SpoqaHanSansBold.ttf"
 _FONT_REGULAR = _FONT_DIR / "SpoqaHanSansRegular.ttf"
 
-MAIN_COPY_SIZE = 80
-SUB_COPY_SIZE = 52
+DEFAULT_MAIN_SIZE = 48
+DEFAULT_SUB_SIZE = 39
 MAIN_COPY_COLOR = (76, 76, 76)
 SUB_COPY_COLOR = (119, 119, 119)
 
-GUIDELINE_COLOR = (220, 60, 60)
-GUIDELINE_WIDTH = 2
-SAFE_MARGIN = 30
+SAFE_MARGIN = 20
+GUIDELINE_COLOR = (190, 190, 190)
 
 
 def _load_font(path: Path, size: int) -> ImageFont.FreeTypeFont:
@@ -39,15 +38,40 @@ def _paste_image(canvas: Image.Image, layer: Optional[Image.Image], x: int, y: i
 
 
 def _draw_guidelines(canvas: Image.Image) -> Image.Image:
-    """Draw safe-area guideline border on a copy of the canvas (preview only)."""
+    """Draw a subtle dashed safe-area rectangle on a copy of the canvas."""
     preview = canvas.copy()
     draw = ImageDraw.Draw(preview)
     m = SAFE_MARGIN
-    w, h = CANVAS_W, CANVAS_H
-    # outer border
-    draw.rectangle([(0, 0), (w - 1, h - 1)], outline=GUIDELINE_COLOR, width=GUIDELINE_WIDTH)
-    # safe area inner border
-    draw.rectangle([(m, m), (w - m - 1, h - m - 1)], outline=GUIDELINE_COLOR, width=1)
+    x0, y0 = m, m
+    x1, y1 = CANVAS_W - m - 1, CANVAS_H - m - 1
+    dash_len, gap_len = 8, 5
+
+    def draw_dashed_line(p1, p2):
+        px, py = p1
+        ex, ey = p2
+        dx = ex - px
+        dy = ey - py
+        length = (dx**2 + dy**2) ** 0.5
+        if length == 0:
+            return
+        ux, uy = dx / length, dy / length
+        pos = 0
+        drawing = True
+        while pos < length:
+            seg = dash_len if drawing else gap_len
+            end_pos = min(pos + seg, length)
+            if drawing:
+                draw.line(
+                    [(px + ux * pos, py + uy * pos), (px + ux * end_pos, py + uy * end_pos)],
+                    fill=GUIDELINE_COLOR, width=1,
+                )
+            pos = end_pos
+            drawing = not drawing
+
+    draw_dashed_line((x0, y0), (x1, y0))
+    draw_dashed_line((x1, y0), (x1, y1))
+    draw_dashed_line((x1, y1), (x0, y1))
+    draw_dashed_line((x0, y1), (x0, y0))
     return preview
 
 
@@ -55,19 +79,20 @@ def render(
     product_images: Optional[list] = None,
     logo_image: Optional[Image.Image] = None,
     logo_x: int = 20,
-    logo_y: int = 15,
-    logo_scale: int = 20,
+    logo_y: int = 12,
+    logo_scale: int = 15,
     main_copy: str = "",
-    main_x: int = 500,
-    main_y: int = 200,
+    main_x: int = 50,
+    main_y: int = 70,
+    main_copy_size: int = DEFAULT_MAIN_SIZE,
     sub_copy: str = "",
-    sub_x: int = 500,
-    sub_y: int = 320,
+    sub_x: int = 50,
+    sub_y: int = 155,
+    sub_copy_size: int = DEFAULT_SUB_SIZE,
     show_guidelines: bool = False,
 ) -> Image.Image:
     canvas = Image.new("RGB", (CANVAS_W, CANVAS_H), BG_COLOR)
 
-    # render product images (list of dicts: {image, x, y, scale})
     if product_images:
         for item in product_images:
             _paste_image(canvas, item.get("image"), item.get("x", 0), item.get("y", 0), item.get("scale", 75))
@@ -77,11 +102,11 @@ def render(
     draw = ImageDraw.Draw(canvas)
 
     if main_copy:
-        font = _load_font(_FONT_BOLD, MAIN_COPY_SIZE)
+        font = _load_font(_FONT_BOLD, main_copy_size)
         draw.text((main_x, main_y), main_copy, font=font, fill=MAIN_COPY_COLOR)
 
     if sub_copy:
-        font = _load_font(_FONT_REGULAR, SUB_COPY_SIZE)
+        font = _load_font(_FONT_REGULAR, sub_copy_size)
         draw.text((sub_x, sub_y), sub_copy, font=font, fill=SUB_COPY_COLOR)
 
     if show_guidelines:

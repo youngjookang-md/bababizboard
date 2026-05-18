@@ -1,29 +1,29 @@
-CANVAS_W = 1200
-CANVAS_H = 600
+CANVAS_W = 1029
+CANVAS_H = 258
 
-TEMPLATE_NAMES = ["left_image", "right_image", "text_focus"]
+TEMPLATE_NAMES = ["right_image", "left_image", "text_focus"]
 
 _TEMPLATES = {
-    "left_image": {
-        "label": "좌측 이미지형",
-        "default_product": {"x": 30, "y": 50, "scale": 75},
-        "logo": {"x": 20, "y": 15, "scale": 20},
-        "main_text": {"x": 520, "y": 200},
-        "sub_text":  {"x": 520, "y": 330},
-    },
     "right_image": {
         "label": "우측 이미지형",
-        "default_product": {"x": 680, "y": 50, "scale": 75},
-        "logo": {"x": 20, "y": 15, "scale": 20},
-        "main_text": {"x": 50, "y": 200},
-        "sub_text":  {"x": 50, "y": 330},
+        "default_product": {"x": 600, "y": 10, "scale": 80},
+        "logo": {"x": 20, "y": 12, "scale": 15},
+        "main_text": {"x": 50, "y": 70, "size": 48},
+        "sub_text":  {"x": 50, "y": 155, "size": 39},
+    },
+    "left_image": {
+        "label": "좌측 이미지형",
+        "default_product": {"x": 20, "y": 10, "scale": 80},
+        "logo": {"x": 20, "y": 12, "scale": 15},
+        "main_text": {"x": 430, "y": 70, "size": 48},
+        "sub_text":  {"x": 430, "y": 155, "size": 39},
     },
     "text_focus": {
         "label": "텍스트 강조형",
-        "default_product": {"x": 850, "y": 30, "scale": 60},
-        "logo": {"x": 20, "y": 15, "scale": 18},
-        "main_text": {"x": 50, "y": 150},
-        "sub_text":  {"x": 50, "y": 300},
+        "default_product": {"x": 800, "y": 10, "scale": 60},
+        "logo": {"x": 20, "y": 12, "scale": 15},
+        "main_text": {"x": 50, "y": 60, "size": 48},
+        "sub_text":  {"x": 50, "y": 155, "size": 39},
     },
 }
 
