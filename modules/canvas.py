@@ -75,6 +75,19 @@ def _draw_guidelines(canvas: Image.Image) -> Image.Image:
     return preview
 
 
+def _draw_badge(draw: ImageDraw.ImageDraw, text: str, x: int, y: int,
+                font: ImageFont.FreeTypeFont, bg_color: tuple, text_color: tuple) -> None:
+    """Draw a pill-shaped badge with background color."""
+    pad_x, pad_y = 10, 5
+    bbox = font.getbbox(text)
+    tw = bbox[2] - bbox[0]
+    th = bbox[3] - bbox[1]
+    rx0, ry0 = x, y
+    rx1, ry1 = x + tw + pad_x * 2, y + th + pad_y * 2
+    draw.rounded_rectangle([rx0, ry0, rx1, ry1], radius=5, fill=bg_color)
+    draw.text((rx0 + pad_x, ry0 + pad_y - bbox[1]), text, font=font, fill=text_color)
+
+
 def render(
     product_images: Optional[list] = None,
     logo_image: Optional[Image.Image] = None,
@@ -89,6 +102,7 @@ def render(
     sub_x: int = 50,
     sub_y: int = 155,
     sub_copy_size: int = DEFAULT_SUB_SIZE,
+    badges: Optional[list] = None,
     show_guidelines: bool = False,
 ) -> Image.Image:
     canvas = Image.new("RGB", (CANVAS_W, CANVAS_H), BG_COLOR)
@@ -108,6 +122,18 @@ def render(
     if sub_copy:
         font = _load_font(_FONT_REGULAR, sub_copy_size)
         draw.text((sub_x, sub_y), sub_copy, font=font, fill=SUB_COPY_COLOR)
+
+    for badge in (badges or []):
+        bfont = _load_font(_FONT_BOLD, badge.get("font_size", 28))
+        _draw_badge(
+            draw,
+            badge["text"],
+            badge.get("x", 50),
+            badge.get("y", 100),
+            bfont,
+            tuple(badge.get("bg_color", (29, 158, 117))),
+            tuple(badge.get("text_color", (255, 255, 255))),
+        )
 
     if show_guidelines:
         canvas = _draw_guidelines(canvas)

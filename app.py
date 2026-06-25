@@ -7,6 +7,16 @@ from modules.bg_remover import remove_background
 from modules.templates import get_template, template_label_map, TEMPLATE_NAMES
 from modules.layer_controls import render_controls
 from modules.storage import save_project, load_project, list_projects
+from modules.presets import save_preset, load_preset, list_presets, delete_preset
+
+BADGE_COLORS = {
+    "초록": {"bg": (29, 158, 117), "text": (255, 255, 255)},
+    "빨강": {"bg": (226, 75, 74), "text": (255, 255, 255)},
+    "노랑": {"bg": (239, 159, 39), "text": (255, 255, 255)},
+    "파랑": {"bg": (55, 138, 221), "text": (255, 255, 255)},
+    "보라": {"bg": (127, 119, 221), "text": (255, 255, 255)},
+    "어두운": {"bg": (68, 68, 65), "text": (255, 255, 255)},
+}
 
 st.set_page_config(page_title="카카오 비즈보드 제작 툴", layout="wide")
 
@@ -75,6 +85,8 @@ if "product_upload_key" not in st.session_state:
     st.session_state.product_upload_key = 0
 if "logo_upload_key" not in st.session_state:
     st.session_state.logo_upload_key = 0
+if "badges" not in st.session_state:
+    st.session_state.badges = []
 
 # ── Tabs ──────────────────────────────────────────────────────────
 tab_make, tab_projects = st.tabs(["🎨 제작", "📁 저장된 프로젝트"])
@@ -252,6 +264,88 @@ with tab_make:
         st.session_state.layers = updated_layers
 
         st.divider()
+
+        # ── Layout presets ────────────────────────────────────────
+        st.subheader("📐 레이아웃 프리셋")
+
+        saved_presets = list_presets()
+        if saved_presets:
+            for pname in saved_presets:
+                col_pname, col_apply, col_del = st.columns([4, 2, 1])
+                with col_pname:
+                    st.markdown(f"<div style='padding-top:6px;font-size:14px'>📌 {pname}</div>", unsafe_allow_html=True)
+                with col_apply:
+                    if st.button("적용", key=f"apply_preset_{pname}", use_container_width=True):
+                        preset = load_preset(pname)
+                        st.session_state.layers["logo"] = preset["logo"]
+                        st.session_state.layers["main_text"] = preset["main_text"]
+                        st.session_state.layers["sub_text"] = preset["sub_text"]
+                        _sync_sliders(st.session_state.layers, len(st.session_state.product_images))
+                        st.rerun()
+                with col_del:
+                    if st.button("✕", key=f"del_preset_{pname}"):
+                        delete_preset(pname)
+                        st.rerun()
+        else:
+            st.caption("저장된 프리셋이 없습니다.")
+
+        with st.expander("현재 위치를 프리셋으로 저장"):
+            preset_name = st.text_input("프리셋 이름", key="preset_name_input", placeholder="예: 여름세일 레이아웃")
+            if st.button("💾 프리셋 저장", key="btn_save_preset", use_container_width=True):
+                if not preset_name.strip():
+                    st.warning("이름을 입력해 주세요.")
+                else:
+                    save_preset(preset_name.strip(), st.session_state.layers)
+                    st.success(f"'{preset_name}' 저장 완료!")
+                    st.rerun()
+
+        st.divider()
+
+        # ── Badge text ────────────────────────────────────────────
+        st.subheader("🏷 뱃지 텍스트")
+
+        with st.expander("새 뱃지 추가", expanded=len(st.session_state.badges) == 0):
+            badge_text = st.text_input("뱃지 텍스트", key="badge_text_input", placeholder="예: ~30%")
+            badge_color_name = st.selectbox("배경 색상", list(BADGE_COLORS.keys()), key="badge_color_select")
+            badge_size = st.slider("글자 크기(pt)", 14, 60, 28, key="badge_size_slider")
+            col_bx, col_by = st.columns(2)
+            with col_bx:
+                badge_x = st.slider("뱃지 X", 0, 950, 200, key="badge_x_slider")
+            with col_by:
+                badge_y = st.slider("뱃지 Y", 0, 220, 150, key="badge_y_slider")
+            if st.button("➕ 뱃지 추가", key="btn_add_badge", use_container_width=True):
+                if not badge_text.strip():
+                    st.warning("텍스트를 입력해 주세요.")
+                else:
+                    color = BADGE_COLORS[badge_color_name]
+                    st.session_state.badges.append({
+                        "text": badge_text.strip(),
+                        "bg_color": list(color["bg"]),
+                        "text_color": list(color["text"]),
+                        "font_size": badge_size,
+                        "x": badge_x,
+                        "y": badge_y,
+                    })
+                    st.rerun()
+
+        if st.session_state.badges:
+            st.caption(f"등록된 뱃지 {len(st.session_state.badges)}개")
+            for i, badge in enumerate(st.session_state.badges):
+                col_bi, col_bdel = st.columns([5, 1])
+                with col_bi:
+                    color_hex = "#{:02X}{:02X}{:02X}".format(*badge["bg_color"])
+                    st.markdown(
+                        f'<span style="background:{color_hex};color:#fff;padding:2px 8px;border-radius:4px;font-size:13px">'
+                        f'{badge["text"]}</span> '
+                        f'<span style="font-size:12px;color:gray">({badge["x"]}, {badge["y"]})</span>',
+                        unsafe_allow_html=True,
+                    )
+                with col_bdel:
+                    if st.button("✕", key=f"del_badge_{i}"):
+                        st.session_state.badges.pop(i)
+                        st.rerun()
+
+        st.divider()
         st.session_state.show_guidelines = st.toggle(
             "가이드라인 표시", value=st.session_state.show_guidelines, key="guideline_toggle"
         )
@@ -272,6 +366,7 @@ with tab_make:
         sub_x=layers["sub_text"]["x"],
         sub_y=layers["sub_text"]["y"],
         sub_copy_size=layers["sub_text"].get("size", 39),
+        badges=st.session_state.badges,
         show_guidelines=st.session_state.show_guidelines,
     )
 
@@ -292,6 +387,7 @@ with tab_make:
         sub_x=layers["sub_text"]["x"],
         sub_y=layers["sub_text"]["y"],
         sub_copy_size=layers["sub_text"].get("size", 39),
+        badges=st.session_state.badges,
         show_guidelines=False,
     )
 
