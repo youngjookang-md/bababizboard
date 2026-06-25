@@ -145,7 +145,8 @@ with tab_make:
     with col_tmpl:
         label_map = template_label_map()
         tmpl_labels = [label_map[k] for k in TEMPLATE_NAMES]
-        selected_label = st.selectbox("템플릿", tmpl_labels, key="tmpl_select")
+        cur_idx = TEMPLATE_NAMES.index(st.session_state.template) if st.session_state.template in TEMPLATE_NAMES else 0
+        selected_label = st.selectbox("템플릿", tmpl_labels, index=cur_idx)
         selected_key = TEMPLATE_NAMES[tmpl_labels.index(selected_label)]
         if selected_key != st.session_state.template:
             st.session_state.template = selected_key
@@ -154,7 +155,6 @@ with tab_make:
             new_layers["products"] = [dict(dp) for _ in st.session_state.product_images]
             st.session_state.layers = new_layers
             _sync_sliders(new_layers, len(st.session_state.product_images))
-            st.session_state["tmpl_select"] = label_map[selected_key]
             st.rerun()
 
     with col_name:
@@ -188,7 +188,6 @@ with tab_make:
                 st.session_state.logo_image = loaded.get("logo_image")
                 st.session_state["main_copy"] = loaded.get("main_copy", "")
                 st.session_state["sub_copy"] = loaded.get("sub_copy", "")
-                st.session_state["tmpl_select"] = template_label_map()[loaded["template"]]
                 _sync_sliders(loaded["layers"], len(loaded.get("product_images", [])))
                 st.rerun()
 
@@ -503,6 +502,5 @@ with tab_projects:
                         st.session_state.logo_image = loaded.get("logo_image")
                         st.session_state["main_copy"] = loaded.get("main_copy", "")
                         st.session_state["sub_copy"] = loaded.get("sub_copy", "")
-                        st.session_state["tmpl_select"] = template_label_map()[loaded["template"]]
                         _sync_sliders(loaded["layers"], len(loaded.get("product_images", [])))
                         st.success(f"'{proj_name}' 불러오기 완료! 제작 탭으로 이동하세요.")

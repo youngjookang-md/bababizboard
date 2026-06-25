@@ -1,7 +1,7 @@
 CANVAS_W = 1029
 CANVAS_H = 258
 
-TEMPLATE_NAMES = ["right_image", "left_image", "text_focus"]
+TEMPLATE_NAMES = ["right_image", "left_image", "center_image", "text_focus"]
 
 _TEMPLATES = {
     "right_image": {
@@ -17,6 +17,13 @@ _TEMPLATES = {
         "logo": {"x": 20, "y": 12, "scale": 15},
         "main_text": {"x": 430, "y": 70, "size": 48},
         "sub_text":  {"x": 430, "y": 155, "size": 39},
+    },
+    "center_image": {
+        "label": "가운데 이미지형",
+        "default_product": {"x": 390, "y": 0, "scale": 80},
+        "logo": {"x": 860, "y": 15, "scale": 12},
+        "main_text": {"x": 30, "y": 65, "size": 46},
+        "sub_text":  {"x": 590, "y": 65, "size": 40},
     },
     "text_focus": {
         "label": "텍스트 강조형",
