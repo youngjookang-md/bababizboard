@@ -31,7 +31,7 @@ let c, ctx;
 function post(msg){ window.parent.postMessage({isStreamlitMessage:true,...msg},'*'); }
 function ready(){   post({type:'streamlit:componentReady', apiVersion:1}); }
 function setH(h){   post({type:'streamlit:setFrameHeight', height:h}); }
-function emit(v){   post({type:'streamlit:componentValueChanged', value:v}); }
+function emit(v){   post({type:'streamlit:setComponentValue', value:v, dataType:'json'}); }
 
 /* ── Compute display size from actual container ── */
 function getDisplayW(){ return document.documentElement.clientWidth || 700; }

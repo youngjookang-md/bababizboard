@@ -129,6 +129,8 @@ if st.session_state.drag_pending is not None:
         if _i < len(st.session_state.badges):
             st.session_state.badges[_i]["x"] = _x
             st.session_state.badges[_i]["y"] = _y
+    # Clear cached component value so next render returns None (prevents loop)
+    st.session_state["drag_canvas"] = None
 
 # ── Tabs ──────────────────────────────────────────────────────────
 tab_make, tab_projects = st.tabs(["🎨 제작", "📁 저장된 프로젝트"])
