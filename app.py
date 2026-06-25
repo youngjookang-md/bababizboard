@@ -109,11 +109,10 @@ if st.session_state.drag_pending is not None:
             st.session_state[f"prod_x_{_i}"] = _x
             st.session_state[f"prod_y_{_i}"] = _y
     elif _id == "logo":
-        _x2, _y2 = min(_x, 200), min(_y, 80)
-        st.session_state.layers["logo"]["x"] = _x2
-        st.session_state.layers["logo"]["y"] = _y2
-        st.session_state["logo_x"] = _x2
-        st.session_state["logo_y"] = _y2
+        st.session_state.layers["logo"]["x"] = _x
+        st.session_state.layers["logo"]["y"] = _y
+        st.session_state["logo_x"] = _x
+        st.session_state["logo_y"] = _y
     elif _id == "main_text":
         st.session_state.layers["main_text"]["x"] = _x
         st.session_state.layers["main_text"]["y"] = _y

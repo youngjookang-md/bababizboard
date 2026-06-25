@@ -14,8 +14,8 @@ def render_controls(layers: dict, num_products: int) -> dict:
 
     with st.sidebar.expander("🖼 로고 위치", expanded=False):
         updated["logo"] = {
-            "x": _ctrl("로고 X", "logo_x", 0, 200, layers["logo"]["x"]),
-            "y": _ctrl("로고 Y", "logo_y", 0, 80, layers["logo"]["y"]),
+            "x": _ctrl("로고 X", "logo_x", 0, 950, layers["logo"]["x"]),
+            "y": _ctrl("로고 Y", "logo_y", 0, 230, layers["logo"]["y"]),
             "scale": _ctrl("로고 크기(%)", "logo_scale", 5, 60, layers["logo"]["scale"]),
         }
 
