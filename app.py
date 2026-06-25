@@ -8,6 +8,7 @@ from modules.templates import get_template, template_label_map, TEMPLATE_NAMES
 from modules.layer_controls import render_controls
 from modules.storage import save_project, load_project, list_projects
 from modules.presets import save_preset, load_preset, list_presets, delete_preset
+from components.canvas_drag import canvas_drag
 
 BADGE_COLORS = {
     "초록": {"bg": (29, 158, 117), "text": (255, 255, 255)},
@@ -87,46 +88,42 @@ if "logo_upload_key" not in st.session_state:
     st.session_state.logo_upload_key = 0
 if "badges" not in st.session_state:
     st.session_state.badges = []
-if "move_target" not in st.session_state:
-    st.session_state.move_target = "— 선택 안 함 —"
-if "click_pending" not in st.session_state:
-    st.session_state.click_pending = None
+if "drag_pending" not in st.session_state:
+    st.session_state.drag_pending = None
 
-# ── Process canvas click BEFORE sidebar renders ───────────────────
-# (setting widget keys after render raises StreamlitAPIException)
-if st.session_state.click_pending is not None:
-    coords, target = st.session_state.click_pending
-    st.session_state.click_pending = None
-    _scale = CANVAS_W / 700
-    cx = min(int(coords["x"] * _scale), CANVAS_W - 1)
-    cy = min(int(coords["y"] * _scale), CANVAS_H - 1)
-    if target.startswith("상품 이미지 "):
-        idx = int(target.split()[-1]) - 1
-        if idx < len(st.session_state.product_images):
-            st.session_state.product_images[idx]["x"] = cx
-            st.session_state.product_images[idx]["y"] = cy
-            prods = st.session_state.layers.get("products", [])
-            if idx < len(prods):
-                prods[idx]["x"] = cx
-                prods[idx]["y"] = cy
-            st.session_state[f"prod_x_{idx}"] = cx
-            st.session_state[f"prod_y_{idx}"] = cy
-    elif target == "로고":
-        cx = min(cx, 200); cy = min(cy, 80)
-        st.session_state.layers["logo"]["x"] = cx
-        st.session_state.layers["logo"]["y"] = cy
-        st.session_state["logo_x"] = cx
-        st.session_state["logo_y"] = cy
-    elif target == "메인 카피":
-        st.session_state.layers["main_text"]["x"] = cx
-        st.session_state.layers["main_text"]["y"] = cy
-        st.session_state["main_x"] = cx
-        st.session_state["main_y"] = cy
-    elif target == "서브 카피":
-        st.session_state.layers["sub_text"]["x"] = cx
-        st.session_state.layers["sub_text"]["y"] = cy
-        st.session_state["sub_x"] = cx
-        st.session_state["sub_y"] = cy
+# ── Apply drag result BEFORE sidebar renders ──────────────────────
+# (widget key assignment after render raises StreamlitAPIException)
+if st.session_state.drag_pending is not None:
+    _r = st.session_state.drag_pending
+    st.session_state.drag_pending = None
+    _id, _x, _y = _r["id"], _r["x"], _r["y"]
+    if _id.startswith("product_"):
+        _i = int(_id.split("_")[1])
+        if _i < len(st.session_state.product_images):
+            st.session_state.product_images[_i]["x"] = _x
+            st.session_state.product_images[_i]["y"] = _y
+            _prods = st.session_state.layers.get("products", [])
+            if _i < len(_prods):
+                _prods[_i]["x"] = _x
+                _prods[_i]["y"] = _y
+            st.session_state[f"prod_x_{_i}"] = _x
+            st.session_state[f"prod_y_{_i}"] = _y
+    elif _id == "logo":
+        _x2, _y2 = min(_x, 200), min(_y, 80)
+        st.session_state.layers["logo"]["x"] = _x2
+        st.session_state.layers["logo"]["y"] = _y2
+        st.session_state["logo_x"] = _x2
+        st.session_state["logo_y"] = _y2
+    elif _id == "main_text":
+        st.session_state.layers["main_text"]["x"] = _x
+        st.session_state.layers["main_text"]["y"] = _y
+        st.session_state["main_x"] = _x
+        st.session_state["main_y"] = _y
+    elif _id == "sub_text":
+        st.session_state.layers["sub_text"]["x"] = _x
+        st.session_state.layers["sub_text"]["y"] = _y
+        st.session_state["sub_x"] = _x
+        st.session_state["sub_y"] = _y
 
 # ── Tabs ──────────────────────────────────────────────────────────
 tab_make, tab_projects = st.tabs(["🎨 제작", "📁 저장된 프로젝트"])
@@ -423,37 +420,22 @@ with tab_make:
         show_guidelines=st.session_state.show_guidelines,
     )
 
-    # ── Click-to-move ─────────────────────────────────────────────
-    move_options = ["— 선택 안 함 —"]
-    for i in range(len(st.session_state.product_images)):
-        move_options.append(f"상품 이미지 {i + 1}")
-    move_options += ["로고", "메인 카피", "서브 카피"]
+    # ── Drag canvas ───────────────────────────────────────────────
+    drag_elements = []
+    for i, item in enumerate(st.session_state.product_images):
+        prods = layers.get("products", [])
+        px = prods[i]["x"] if i < len(prods) else item.get("x", 600)
+        py = prods[i]["y"] if i < len(prods) else item.get("y", 10)
+        drag_elements.append({"id": f"product_{i}", "type": "product", "label": f"P{i+1}", "x": px, "y": py})
+    drag_elements.append({"id": "logo",      "type": "logo",      "label": "L", "x": layers["logo"]["x"],      "y": layers["logo"]["y"]})
+    drag_elements.append({"id": "main_text", "type": "main_text", "label": "M", "x": layers["main_text"]["x"],  "y": layers["main_text"]["y"]})
+    drag_elements.append({"id": "sub_text",  "type": "sub_text",  "label": "S", "x": layers["sub_text"]["x"],   "y": layers["sub_text"]["y"]})
 
-    col_move_label, col_move_sel = st.columns([2, 4])
-    with col_move_label:
-        st.caption("📍 클릭으로 이동할 요소")
-    with col_move_sel:
-        st.session_state.move_target = st.selectbox(
-            "이동할 요소", move_options,
-            index=move_options.index(st.session_state.move_target) if st.session_state.move_target in move_options else 0,
-            key="move_target_select", label_visibility="collapsed",
-        )
-
-    PREVIEW_W = 700
-    scale = CANVAS_W / PREVIEW_W
-
-    try:
-        from streamlit_image_coordinates import streamlit_image_coordinates
-        coords = streamlit_image_coordinates(canvas_img, key="canvas_click", width=PREVIEW_W)
-        if coords and st.session_state.move_target != "— 선택 안 함 —":
-            if st.session_state.click_pending is None:
-                st.session_state.click_pending = (coords, st.session_state.move_target)
-                st.rerun()
-    except ImportError:
-        st.image(canvas_img, caption=f"미리보기 ({CANVAS_W}×{CANVAS_H}px)", width=PREVIEW_W)
-
-    if st.session_state.move_target != "— 선택 안 함 —":
-        st.caption(f"💡 캔버스를 클릭하면 **{st.session_state.move_target}**이(가) 해당 위치로 이동합니다.")
+    st.caption("🔴상품  🟢로고  🔵메인카피  🟣서브카피 — 핸들을 드래그해서 이동하세요")
+    drag_result = canvas_drag(canvas_img, drag_elements, CANVAS_W, CANVAS_H, 700, key="drag_canvas")
+    if drag_result and st.session_state.drag_pending is None:
+        st.session_state.drag_pending = drag_result
+        st.rerun()
 
     # Download (always without guidelines)
     download_img = render(

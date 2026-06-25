@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:transparent; overflow:hidden; }
+canvas { display:block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const RADIUS = 16;
+const COLORS = {
+  product: '#FF4B4B',
+  logo:    '#22C55E',
+  main_text: '#3B82F6',
+  sub_text:  '#A855F7',
+};
+
+let bgImg = new Image();
+let elements = [];
+let dragging = null;
+let dragOffset = {x:0, y:0};
+let canvasW = 1029, canvasH = 258, previewW = 700;
+let scale = 1;
+let c, ctx;
+
+/* ── Streamlit messaging ── */
+function post(msg) {
+  window.parent.postMessage({isStreamlitMessage:true, ...msg}, '*');
+}
+function ready()    { post({type:'streamlit:componentReady', apiVersion:1}); }
+function setH(h)    { post({type:'streamlit:setFrameHeight', height:h}); }
+function emit(val)  { post({type:'streamlit:componentValueChanged', value:val}); }
+
+window.addEventListener('message', function(e) {
+  if (!e.data || e.data.type !== 'streamlit:render') return;
+  const a = e.data.args;
+  if (!a) return;
+  elements = a.elements || [];
+  canvasW  = a.canvas_w  || 1029;
+  canvasH  = a.canvas_h  || 258;
+  previewW = a.preview_w || 700;
+  scale    = previewW / canvasW;
+  const ph = Math.round(canvasH * scale);
+  c.width  = previewW;
+  c.height = ph;
+  setH(ph + 8);
+  bgImg.src = 'data:image/png;base64,' + a.img_b64;
+});
+
+/* ── Draw ── */
+function draw() {
+  if (!ctx) return;
+  ctx.clearRect(0, 0, c.width, c.height);
+  if (bgImg.complete && bgImg.naturalWidth) ctx.drawImage(bgImg, 0, 0, c.width, c.height);
+
+  elements.forEach(function(el) {
+    const hx = el.x * scale;
+    const hy = el.y * scale;
+    const col = COLORS[el.type] || '#FF4B4B';
+    const isDragging = dragging !== null && elements[dragging] === el;
+
+    ctx.beginPath();
+    ctx.arc(hx, hy, isDragging ? RADIUS + 3 : RADIUS, 0, Math.PI * 2);
+    ctx.fillStyle = col + 'BB';
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = isDragging ? 3 : 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(el.label, hx, hy);
+  });
+}
+
+/* ── Mouse helpers ── */
+function getPos(e) {
+  const r = c.getBoundingClientRect();
+  return {x: (e.clientX - r.left), y: (e.clientY - r.top)};
+}
+function hitTest(mx, my) {
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const hx = elements[i].x * scale;
+    const hy = elements[i].y * scale;
+    if (Math.hypot(mx - hx, my - hy) <= RADIUS) return i;
+  }
+  return null;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  c   = document.getElementById('c');
+  ctx = c.getContext('2d');
+
+  bgImg.onload = draw;
+
+  c.addEventListener('mousedown', function(e) {
+    const {x, y} = getPos(e);
+    const hit = hitTest(x, y);
+    if (hit !== null) {
+      dragging = hit;
+      dragOffset = {x: x - elements[hit].x * scale, y: y - elements[hit].y * scale};
+      c.style.cursor = 'grabbing';
+      e.preventDefault();
+    }
+  });
+
+  c.addEventListener('mousemove', function(e) {
+    const {x, y} = getPos(e);
+    if (dragging === null) {
+      c.style.cursor = hitTest(x, y) !== null ? 'grab' : 'default';
+      return;
+    }
+    const nx = Math.round(Math.max(0, Math.min(canvasW, (x - dragOffset.x) / scale)));
+    const ny = Math.round(Math.max(0, Math.min(canvasH, (y - dragOffset.y) / scale)));
+    elements[dragging] = Object.assign({}, elements[dragging], {x: nx, y: ny});
+    draw();
+    e.preventDefault();
+  });
+
+  function endDrag() {
+    if (dragging !== null) {
+      const el = elements[dragging];
+      emit({id: el.id, x: el.x, y: el.y});
+      dragging = null;
+      c.style.cursor = 'default';
+      draw();
+    }
+  }
+  c.addEventListener('mouseup',    endDrag);
+  c.addEventListener('mouseleave', endDrag);
+
+  /* Touch support */
+  c.addEventListener('touchstart', function(e) {
+    const t = e.touches[0];
+    const r = c.getBoundingClientRect();
+    const x = t.clientX - r.left, y = t.clientY - r.top;
+    const hit = hitTest(x, y);
+    if (hit !== null) {
+      dragging = hit;
+      dragOffset = {x: x - elements[hit].x * scale, y: y - elements[hit].y * scale};
+      e.preventDefault();
+    }
+  }, {passive:false});
+
+  c.addEventListener('touchmove', function(e) {
+    if (dragging === null) return;
+    const t = e.touches[0];
+    const r = c.getBoundingClientRect();
+    const x = t.clientX - r.left, y = t.clientY - r.top;
+    const nx = Math.round(Math.max(0, Math.min(canvasW, (x - dragOffset.x) / scale)));
+    const ny = Math.round(Math.max(0, Math.min(canvasH, (y - dragOffset.y) / scale)));
+    elements[dragging] = Object.assign({}, elements[dragging], {x: nx, y: ny});
+    draw();
+    e.preventDefault();
+  }, {passive:false});
+
+  c.addEventListener('touchend', endDrag);
+
+  ready();
+});
+</script>
+</body>
+</html>
