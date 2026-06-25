@@ -10,19 +10,21 @@ canvas { display:block; width:100%; }
 <body>
 <canvas id="c"></canvas>
 <script>
-const RADIUS = 14;
+const MOVE_R  = 12;
+const RESIZE_R = 7;
 const COLORS = {
-  product:   '#EF4444',
-  logo:      '#22C55E',
-  main_text: '#3B82F6',
-  sub_text:  '#A855F7',
-  badge:     '#F59E0B',
+  product:    '#EF4444',
+  logo:       '#22C55E',
+  main_text:  '#3B82F6',
+  sub_text:   '#A855F7',
+  badge:      '#F59E0B',
+  extra_copy: '#06B6D4',
 };
 
 let bgImg = new Image();
 let elements = [];
-let dragging = null;
-let dragOffset = {x:0, y:0};
+// {type:'move'|'resize', idx, offsetX, offsetY} | {type:'resize', idx, startX, origScale, origW, origH}
+let dragState = null;
 let canvasW = 1029, canvasH = 258;
 let scale = 1;
 let c, ctx;
@@ -33,7 +35,6 @@ function ready(){   post({type:'streamlit:componentReady', apiVersion:1}); }
 function setH(h){   post({type:'streamlit:setFrameHeight', height:h}); }
 function emit(v){   post({type:'streamlit:setComponentValue', value:v, dataType:'json'}); }
 
-/* ── Compute display size from actual container ── */
 function getDisplayW(){ return document.documentElement.clientWidth || 700; }
 
 function resize(){
@@ -46,7 +47,6 @@ function resize(){
   draw();
 }
 
-/* ── Receive render event from Python ── */
 window.addEventListener('message', function(e){
   if (!e.data || e.data.type !== 'streamlit:render') return;
   const a = e.data.args;
@@ -58,6 +58,20 @@ window.addEventListener('message', function(e){
   resize();
 });
 
+/* ── Helpers ── */
+function elCenter(el){
+  if (el.w && el.h){
+    return {x:(el.x + el.w/2)*scale, y:(el.y + el.h/2)*scale};
+  }
+  return {x:el.x*scale, y:el.y*scale};
+}
+function resizeCorner(el){
+  if (el.w && el.h && el.scale !== undefined){
+    return {x:(el.x+el.w)*scale, y:(el.y+el.h)*scale};
+  }
+  return null;
+}
+
 /* ── Draw ── */
 function draw(){
   if (!ctx) return;
@@ -66,147 +80,176 @@ function draw(){
     ctx.drawImage(bgImg,0,0,c.width,c.height);
 
   elements.forEach(function(el, idx){
-    const hx = el.x * scale;
-    const hy = el.y * scale;
-    const col = COLORS[el.type] || '#FF4B4B';
-    const active = (dragging === idx);
-    const r = active ? RADIUS + 4 : RADIUS;
+    const col  = COLORS[el.type] || '#FF4B4B';
+    const isMoving   = dragState && dragState.type==='move'   && dragState.idx===idx;
+    const isResizing = dragState && dragState.type==='resize' && dragState.idx===idx;
+    const isActive   = isMoving || isResizing;
 
-    /* shadow */
+    /* bounding box */
+    if (el.w && el.h){
+      ctx.save();
+      ctx.strokeStyle = col + (isActive ? 'DD' : '55');
+      ctx.lineWidth   = isActive ? 2 : 1;
+      ctx.setLineDash([4,3]);
+      ctx.strokeRect(el.x*scale, el.y*scale, el.w*scale, el.h*scale);
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    /* move handle at center */
+    const ctr = elCenter(el);
+    const r = isMoving ? MOVE_R + 4 : MOVE_R;
     ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.35)';
-    ctx.shadowBlur  = 6;
-    ctx.beginPath();
-    ctx.arc(hx, hy, r, 0, Math.PI*2);
-    ctx.fillStyle = col + (active ? 'EE':'BB');
+    ctx.shadowColor='rgba(0,0,0,.35)'; ctx.shadowBlur=6;
+    ctx.beginPath(); ctx.arc(ctr.x, ctr.y, r, 0, Math.PI*2);
+    ctx.fillStyle = col + (isActive ? 'EE':'BB');
     ctx.fill();
     ctx.restore();
-
-    ctx.beginPath();
-    ctx.arc(hx, hy, r, 0, Math.PI*2);
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = active ? 3 : 2;
+    ctx.beginPath(); ctx.arc(ctr.x, ctr.y, r, 0, Math.PI*2);
+    ctx.strokeStyle='#fff'; ctx.lineWidth = isMoving ? 3 : 2;
     ctx.stroke();
-
-    /* crosshair lines */
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5;
     ctx.beginPath();
-    ctx.moveTo(hx - r*0.5, hy); ctx.lineTo(hx + r*0.5, hy);
-    ctx.moveTo(hx, hy - r*0.5); ctx.lineTo(hx, hy + r*0.5);
+    ctx.moveTo(ctr.x-r*.5,ctr.y); ctx.lineTo(ctr.x+r*.5,ctr.y);
+    ctx.moveTo(ctr.x,ctr.y-r*.5); ctx.lineTo(ctr.x,ctr.y+r*.5);
     ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.font='bold 10px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillText(el.label, ctr.x, ctr.y - r*.5 + 1);
 
-    /* label */
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 10px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(el.label, hx, hy - r*0.5 + 1);
+    /* resize handle at bottom-right */
+    const rc = resizeCorner(el);
+    if (rc){
+      ctx.save();
+      ctx.shadowColor='rgba(0,0,0,.25)'; ctx.shadowBlur=4;
+      ctx.beginPath(); ctx.arc(rc.x, rc.y, RESIZE_R, 0, Math.PI*2);
+      ctx.fillStyle = isResizing ? col : (col+'99');
+      ctx.fill();
+      ctx.restore();
+      ctx.beginPath(); ctx.arc(rc.x, rc.y, RESIZE_R, 0, Math.PI*2);
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+      /* ↔ icon */
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1.2;
+      ctx.beginPath();
+      ctx.moveTo(rc.x-3,rc.y-1); ctx.lineTo(rc.x+3,rc.y-1);
+      ctx.moveTo(rc.x-1,rc.y+3); ctx.lineTo(rc.x-1,rc.y-3);
+      ctx.stroke();
+    }
 
     /* coordinate readout while dragging */
-    if (active){
-      const txt = `${el.x}, ${el.y}`;
-      const px = Math.min(hx + r + 4, c.width - 60);
-      const py = Math.max(hy - r - 2, 14);
-      ctx.fillStyle = 'rgba(0,0,0,0.7)';
-      ctx.roundRect(px - 2, py - 12, txt.length * 6.5 + 4, 16, 3);
+    if (isActive){
+      const txt = isResizing ? 'scale:'+el.scale+'%' : el.x+', '+el.y;
+      const px = Math.min(ctr.x + r + 4, c.width - 90);
+      const py = Math.max(ctr.y - r - 2, 14);
+      ctx.fillStyle='rgba(0,0,0,.7)';
+      ctx.roundRect(px-2, py-12, txt.length*6.5+4, 16, 3);
       ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.font = '11px monospace';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(txt, px, py - 4);
+      ctx.fillStyle='#fff'; ctx.font='11px monospace';
+      ctx.textAlign='left'; ctx.textBaseline='middle';
+      ctx.fillText(txt, px, py-4);
     }
   });
 }
 
-/* ── Mouse / Touch helpers ── */
+/* ── Hit test ── */
 function getPos(e){
-  const r = c.getBoundingClientRect();
-  const scaleX = c.width  / r.width;
-  const scaleY = c.height / r.height;
-  return {
-    x: (e.clientX - r.left) * scaleX,
-    y: (e.clientY - r.top)  * scaleY
-  };
+  const r=c.getBoundingClientRect();
+  return {x:(e.clientX-r.left)*(c.width/r.width), y:(e.clientY-r.top)*(c.height/r.height)};
 }
-function hitTest(mx,my){
-  for (let i=elements.length-1; i>=0; i--){
-    const hx=elements[i].x*scale, hy=elements[i].y*scale;
-    if (Math.hypot(mx-hx, my-hy) <= RADIUS+4) return i;
+function hitTest(mx, my){
+  /* resize corners first */
+  for(let i=elements.length-1;i>=0;i--){
+    const rc = resizeCorner(elements[i]);
+    if(rc && Math.hypot(mx-rc.x, my-rc.y) <= RESIZE_R+4)
+      return {idx:i, type:'resize'};
+  }
+  /* center handle */
+  for(let i=elements.length-1;i>=0;i--){
+    const ctr=elCenter(elements[i]);
+    if(Math.hypot(mx-ctr.x, my-ctr.y) <= MOVE_R+4)
+      return {idx:i, type:'move'};
+  }
+  /* bounding box */
+  for(let i=elements.length-1;i>=0;i--){
+    const el=elements[i];
+    if(el.w && el.h){
+      if(mx>=el.x*scale && mx<=(el.x+el.w)*scale &&
+         my>=el.y*scale && my<=(el.y+el.h)*scale)
+        return {idx:i, type:'move'};
+    }
   }
   return null;
 }
 
-document.addEventListener('DOMContentLoaded', function(){
+/* ── Drag logic ── */
+function startDrag(pos, e){
+  const hit = hitTest(pos.x, pos.y);
+  if(hit===null) return;
+  const el = elements[hit.idx];
+  if(hit.type==='resize'){
+    dragState = {type:'resize', idx:hit.idx, startX:pos.x,
+                 origScale:el.scale||100, origW:el.w||100, origH:el.h||100};
+  } else {
+    dragState = {type:'move', idx:hit.idx,
+                 offsetX:pos.x - el.x*scale, offsetY:pos.y - el.y*scale};
+  }
+  c.style.cursor='grabbing';
+  e.preventDefault();
+}
+function moveDrag(pos, e){
+  if(!dragState){
+    c.style.cursor = hitTest(pos.x,pos.y) ? 'grab' : 'default';
+    return;
+  }
+  const el = elements[dragState.idx];
+  if(dragState.type==='move'){
+    const nx = Math.round(Math.max(0,Math.min(canvasW,(pos.x-dragState.offsetX)/scale)));
+    const ny = Math.round(Math.max(0,Math.min(canvasH,(pos.y-dragState.offsetY)/scale)));
+    elements[dragState.idx] = Object.assign({},el,{x:nx,y:ny});
+  } else {
+    const dx = pos.x - dragState.startX;
+    const newWpx = Math.max(20, dragState.origW*scale + dx);
+    const newScale = Math.round(Math.max(5,Math.min(300, dragState.origScale*(newWpx/(dragState.origW*scale)))));
+    const ratio = newScale/dragState.origScale;
+    elements[dragState.idx] = Object.assign({},el,{
+      scale:newScale, w:Math.round(dragState.origW*ratio), h:Math.round(dragState.origH*ratio)
+    });
+  }
+  draw();
+  e.preventDefault();
+}
+function endDrag(){
+  if(!dragState) return;
+  const el = elements[dragState.idx];
+  if(dragState.type==='move'){
+    emit({id:el.id, action:'move', x:el.x, y:el.y});
+  } else {
+    emit({id:el.id, action:'resize', scale:el.scale});
+  }
+  dragState=null;
+  c.style.cursor='default';
+  draw();
+}
+
+document.addEventListener('DOMContentLoaded',function(){
   c   = document.getElementById('c');
   ctx = c.getContext('2d');
   bgImg.onload = draw;
-
   window.addEventListener('resize', resize);
 
-  /* mouse */
-  c.addEventListener('mousedown', function(e){
-    const {x,y} = getPos(e);
-    const hit = hitTest(x,y);
-    if (hit !== null){
-      dragging = hit;
-      dragOffset = {x: x - elements[hit].x*scale, y: y - elements[hit].y*scale};
-      c.style.cursor = 'grabbing';
-      e.preventDefault();
-    }
-  });
+  c.addEventListener('mousedown', function(e){ startDrag(getPos(e),e); });
+  c.addEventListener('mousemove', function(e){ moveDrag(getPos(e),e); });
+  c.addEventListener('mouseup',   endDrag);
+  c.addEventListener('mouseleave',endDrag);
 
-  c.addEventListener('mousemove', function(e){
-    const {x,y} = getPos(e);
-    if (dragging === null){
-      c.style.cursor = hitTest(x,y)!==null ? 'grab' : 'default';
-      return;
-    }
-    const nx = Math.round(Math.max(0, Math.min(canvasW, (x-dragOffset.x)/scale)));
-    const ny = Math.round(Math.max(0, Math.min(canvasH, (y-dragOffset.y)/scale)));
-    elements[dragging] = Object.assign({},elements[dragging],{x:nx,y:ny});
-    draw();
-    e.preventDefault();
-  });
-
-  function endDrag(){
-    if (dragging !== null){
-      const el = elements[dragging];
-      emit({id:el.id, x:el.x, y:el.y});
-      dragging = null;
-      c.style.cursor = 'default';
-      draw();
-    }
-  }
-  c.addEventListener('mouseup',    endDrag);
-  c.addEventListener('mouseleave', endDrag);
-
-  /* touch */
   function tp(e){ return e.touches[0]; }
-  function tPos(e){
-    const t=tp(e), r=c.getBoundingClientRect();
-    const scaleX=c.width/r.width, scaleY=c.height/r.height;
-    return {x:(t.clientX-r.left)*scaleX, y:(t.clientY-r.top)*scaleY};
+  function tPos(t){
+    const r=c.getBoundingClientRect();
+    return {x:(t.clientX-r.left)*(c.width/r.width), y:(t.clientY-r.top)*(c.height/r.height)};
   }
-  c.addEventListener('touchstart',function(e){
-    const {x,y}=tPos(e), hit=hitTest(x,y);
-    if (hit!==null){
-      dragging=hit;
-      dragOffset={x:x-elements[hit].x*scale, y:y-elements[hit].y*scale};
-      e.preventDefault();
-    }
-  },{passive:false});
-  c.addEventListener('touchmove',function(e){
-    if (dragging===null) return;
-    const {x,y}=tPos(e);
-    const nx=Math.round(Math.max(0,Math.min(canvasW,(x-dragOffset.x)/scale)));
-    const ny=Math.round(Math.max(0,Math.min(canvasH,(y-dragOffset.y)/scale)));
-    elements[dragging]=Object.assign({},elements[dragging],{x:nx,y:ny});
-    draw();
-    e.preventDefault();
-  },{passive:false});
-  c.addEventListener('touchend',endDrag);
+  c.addEventListener('touchstart',function(e){ startDrag(tPos(tp(e)),e); },{passive:false});
+  c.addEventListener('touchmove', function(e){ moveDrag(tPos(tp(e)),e); },{passive:false});
+  c.addEventListener('touchend',  endDrag);
 
   ready();
 });

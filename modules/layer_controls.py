@@ -49,3 +49,14 @@ def render_controls(layers: dict, num_products: int) -> dict:
         }
 
     return updated
+
+
+def render_extra_copy_controls(extra_copies: list) -> list:
+    updated = [dict(ec) for ec in extra_copies]
+    for ci, ec in enumerate(extra_copies):
+        if ec.get("enabled"):
+            with st.sidebar.expander(f"✏️ 카피 {ci+3} 위치", expanded=False):
+                updated[ci]["x"]    = _ctrl(f"카피{ci+3} X",    f"ec_{ci}_x",    0, 950, ec.get("x", 50))
+                updated[ci]["y"]    = _ctrl(f"카피{ci+3} Y",    f"ec_{ci}_y",    0, 230, ec.get("y", 100))
+                updated[ci]["size"] = _ctrl(f"카피{ci+3} 크기", f"ec_{ci}_size", 14,  80, ec.get("size", 36), step=1)
+    return updated

@@ -103,6 +103,7 @@ def render(
     sub_y: int = 155,
     sub_copy_size: int = DEFAULT_SUB_SIZE,
     badges: Optional[list] = None,
+    extra_copies: Optional[list] = None,
     show_guidelines: bool = False,
 ) -> Image.Image:
     canvas = Image.new("RGB", (CANVAS_W, CANVAS_H), BG_COLOR)
@@ -122,6 +123,11 @@ def render(
     if sub_copy:
         font = _load_font(_FONT_REGULAR, sub_copy_size)
         draw.text((sub_x, sub_y), sub_copy, font=font, fill=SUB_COPY_COLOR)
+
+    for ec in (extra_copies or []):
+        if ec.get("enabled") and ec.get("text"):
+            ecfont = _load_font(_FONT_REGULAR, ec.get("size", 36))
+            draw.text((ec.get("x", 50), ec.get("y", 100)), ec["text"], font=ecfont, fill=MAIN_COPY_COLOR)
 
     for badge in (badges or []):
         bfont = _load_font(_FONT_BOLD, badge.get("font_size", 28))

@@ -5,7 +5,7 @@ from PIL import Image
 from modules.canvas import render, CANVAS_W, CANVAS_H
 from modules.bg_remover import remove_background
 from modules.templates import get_template, template_label_map, TEMPLATE_NAMES
-from modules.layer_controls import render_controls
+from modules.layer_controls import render_controls, render_extra_copy_controls
 from modules.storage import save_project, load_project, list_projects
 from modules.presets import save_preset, load_preset, list_presets, delete_preset
 from components.canvas_drag import canvas_drag
@@ -90,44 +90,73 @@ if "badges" not in st.session_state:
     st.session_state.badges = []
 if "drag_pending" not in st.session_state:
     st.session_state.drag_pending = None
+if "extra_copies" not in st.session_state:
+    st.session_state.extra_copies = [
+        {"enabled": False, "text": "", "x": 50, "y": 130, "size": 36},
+        {"enabled": False, "text": "", "x": 300, "y": 130, "size": 36},
+    ]
 
 # ── Apply drag result BEFORE sidebar renders ──────────────────────
 # (widget key assignment after render raises StreamlitAPIException)
 if st.session_state.drag_pending is not None:
     _r = st.session_state.drag_pending
     st.session_state.drag_pending = None
-    _id, _x, _y = _r["id"], _r["x"], _r["y"]
-    if _id.startswith("product_"):
-        _i = int(_id.split("_")[1])
-        if _i < len(st.session_state.product_images):
-            st.session_state.product_images[_i]["x"] = _x
-            st.session_state.product_images[_i]["y"] = _y
-            _prods = st.session_state.layers.get("products", [])
-            if _i < len(_prods):
-                _prods[_i]["x"] = _x
-                _prods[_i]["y"] = _y
-            st.session_state[f"prod_x_{_i}"] = _x
-            st.session_state[f"prod_y_{_i}"] = _y
-    elif _id == "logo":
-        st.session_state.layers["logo"]["x"] = _x
-        st.session_state.layers["logo"]["y"] = _y
-        st.session_state["logo_x"] = _x
-        st.session_state["logo_y"] = _y
-    elif _id == "main_text":
-        st.session_state.layers["main_text"]["x"] = _x
-        st.session_state.layers["main_text"]["y"] = _y
-        st.session_state["main_x"] = _x
-        st.session_state["main_y"] = _y
-    elif _id == "sub_text":
-        st.session_state.layers["sub_text"]["x"] = _x
-        st.session_state.layers["sub_text"]["y"] = _y
-        st.session_state["sub_x"] = _x
-        st.session_state["sub_y"] = _y
-    elif _id.startswith("badge_"):
-        _i = int(_id.split("_")[1])
-        if _i < len(st.session_state.badges):
-            st.session_state.badges[_i]["x"] = _x
-            st.session_state.badges[_i]["y"] = _y
+    _id     = _r["id"]
+    _action = _r.get("action", "move")
+
+    if _action == "resize":
+        _s = int(_r.get("scale", 100))
+        if _id.startswith("product_"):
+            _i = int(_id.split("_")[1])
+            if _i < len(st.session_state.product_images):
+                st.session_state.product_images[_i]["scale"] = _s
+                _prods = st.session_state.layers.get("products", [])
+                if _i < len(_prods):
+                    _prods[_i]["scale"] = _s
+                st.session_state[f"prod_scale_{_i}"] = _s
+        elif _id == "logo":
+            st.session_state.layers["logo"]["scale"] = _s
+            st.session_state["logo_scale"] = _s
+    else:
+        _x, _y = _r["x"], _r["y"]
+        if _id.startswith("product_"):
+            _i = int(_id.split("_")[1])
+            if _i < len(st.session_state.product_images):
+                st.session_state.product_images[_i]["x"] = _x
+                st.session_state.product_images[_i]["y"] = _y
+                _prods = st.session_state.layers.get("products", [])
+                if _i < len(_prods):
+                    _prods[_i]["x"] = _x
+                    _prods[_i]["y"] = _y
+                st.session_state[f"prod_x_{_i}"] = _x
+                st.session_state[f"prod_y_{_i}"] = _y
+        elif _id == "logo":
+            st.session_state.layers["logo"]["x"] = _x
+            st.session_state.layers["logo"]["y"] = _y
+            st.session_state["logo_x"] = _x
+            st.session_state["logo_y"] = _y
+        elif _id == "main_text":
+            st.session_state.layers["main_text"]["x"] = _x
+            st.session_state.layers["main_text"]["y"] = _y
+            st.session_state["main_x"] = _x
+            st.session_state["main_y"] = _y
+        elif _id == "sub_text":
+            st.session_state.layers["sub_text"]["x"] = _x
+            st.session_state.layers["sub_text"]["y"] = _y
+            st.session_state["sub_x"] = _x
+            st.session_state["sub_y"] = _y
+        elif _id.startswith("badge_"):
+            _i = int(_id.split("_")[1])
+            if _i < len(st.session_state.badges):
+                st.session_state.badges[_i]["x"] = _x
+                st.session_state.badges[_i]["y"] = _y
+        elif _id.startswith("extra_copy_"):
+            _ci = int(_id.split("_")[2])
+            if _ci < len(st.session_state.extra_copies):
+                st.session_state.extra_copies[_ci]["x"] = _x
+                st.session_state.extra_copies[_ci]["y"] = _y
+                st.session_state[f"ec_{_ci}_x"] = _x
+                st.session_state[f"ec_{_ci}_y"] = _y
     # Clear cached component value so next render returns None (prevents loop)
     st.session_state["drag_canvas"] = None
 
@@ -288,8 +317,20 @@ with tab_make:
 
         # ── Copy ──────────────────────────────────────────────────
         st.subheader("✏️ 카피")
-        st.text_input("메인 카피", value=st.session_state.get("main_copy", ""), key="main_copy")
-        st.text_input("서브 카피", value=st.session_state.get("sub_copy", ""), key="sub_copy")
+        st.text_input("메인 카피 (필수)", value=st.session_state.get("main_copy", ""), key="main_copy")
+        st.text_input("서브 카피 (필수)", value=st.session_state.get("sub_copy", ""), key="sub_copy")
+
+        with st.expander("➕ 추가 카피 (선택)", expanded=False):
+            for _ci in range(2):
+                _ec = st.session_state.extra_copies[_ci]
+                st.markdown(f"**카피 {_ci+3}**")
+                _enabled = st.checkbox("사용", value=_ec["enabled"], key=f"ec_{_ci}_enabled")
+                st.session_state.extra_copies[_ci]["enabled"] = _enabled
+                if _enabled:
+                    _txt = st.text_input("텍스트", value=_ec.get("text",""), key=f"ec_{_ci}_text")
+                    st.session_state.extra_copies[_ci]["text"] = _txt
+                if _ci == 0:
+                    st.divider()
 
         st.divider()
 
@@ -304,6 +345,10 @@ with tab_make:
                 st.session_state.product_images[i]["scale"] = pos["scale"]
 
         st.session_state.layers = updated_layers
+
+        updated_ec = render_extra_copy_controls(st.session_state.extra_copies)
+        for _ci, _ec in enumerate(updated_ec):
+            st.session_state.extra_copies[_ci].update(_ec)
 
         st.divider()
 
@@ -422,23 +467,58 @@ with tab_make:
         sub_y=layers["sub_text"]["y"],
         sub_copy_size=layers["sub_text"].get("size", 39),
         badges=st.session_state.badges,
+        extra_copies=st.session_state.extra_copies,
         show_guidelines=st.session_state.show_guidelines,
     )
 
     # ── Drag canvas ───────────────────────────────────────────────
     drag_elements = []
+    prods = layers.get("products", [])
     for i, item in enumerate(st.session_state.product_images):
-        prods = layers.get("products", [])
+        _pscale = prods[i]["scale"] if i < len(prods) else item.get("scale", 75)
         px = prods[i]["x"] if i < len(prods) else item.get("x", 600)
         py = prods[i]["y"] if i < len(prods) else item.get("y", 10)
-        drag_elements.append({"id": f"product_{i}", "type": "product", "label": f"P{i+1}", "x": px, "y": py})
-    drag_elements.append({"id": "logo",      "type": "logo",      "label": "L", "x": layers["logo"]["x"],      "y": layers["logo"]["y"]})
-    drag_elements.append({"id": "main_text", "type": "main_text", "label": "M", "x": layers["main_text"]["x"],  "y": layers["main_text"]["y"]})
-    drag_elements.append({"id": "sub_text",  "type": "sub_text",  "label": "S", "x": layers["sub_text"]["x"],   "y": layers["sub_text"]["y"]})
-    for _bi, _badge in enumerate(st.session_state.badges):
-        drag_elements.append({"id": f"badge_{_bi}", "type": "badge", "label": f"B{_bi+1}", "x": _badge["x"], "y": _badge["y"]})
+        _img = item.get("image")
+        _pw = int(_img.width  * _pscale / 100) if _img else 100
+        _ph = int(_img.height * _pscale / 100) if _img else 100
+        drag_elements.append({"id": f"product_{i}", "type": "product", "label": f"P{i+1}",
+                               "x": px, "y": py, "w": _pw, "h": _ph, "scale": _pscale})
 
-    st.caption("🔴상품  🟢로고  🔵메인카피  🟣서브카피  🟡뱃지 — 핸들을 드래그해서 이동하세요")
+    _logo_img = st.session_state.logo_image
+    _lscale = layers["logo"]["scale"]
+    _lw = int(_logo_img.width  * _lscale / 100) if _logo_img else 80
+    _lh = int(_logo_img.height * _lscale / 100) if _logo_img else 40
+    drag_elements.append({"id": "logo", "type": "logo", "label": "L",
+                           "x": layers["logo"]["x"], "y": layers["logo"]["y"],
+                           "w": _lw, "h": _lh, "scale": _lscale})
+
+    _main_str = st.session_state.get("main_copy", "")
+    _msz = layers["main_text"].get("size", 48)
+    drag_elements.append({"id": "main_text", "type": "main_text", "label": "M",
+                           "x": layers["main_text"]["x"], "y": layers["main_text"]["y"],
+                           "w": max(60, int(len(_main_str) * _msz * 0.55)),
+                           "h": int(_msz * 1.3)})
+
+    _sub_str = st.session_state.get("sub_copy", "")
+    _ssz = layers["sub_text"].get("size", 39)
+    drag_elements.append({"id": "sub_text", "type": "sub_text", "label": "S",
+                           "x": layers["sub_text"]["x"], "y": layers["sub_text"]["y"],
+                           "w": max(60, int(len(_sub_str) * _ssz * 0.55)),
+                           "h": int(_ssz * 1.3)})
+
+    for _bi, _badge in enumerate(st.session_state.badges):
+        drag_elements.append({"id": f"badge_{_bi}", "type": "badge", "label": f"B{_bi+1}",
+                               "x": _badge["x"], "y": _badge["y"]})
+
+    for _ci, _ec in enumerate(st.session_state.extra_copies):
+        if _ec.get("enabled") and _ec.get("text"):
+            _ecsz = _ec.get("size", 36)
+            drag_elements.append({"id": f"extra_copy_{_ci}", "type": "extra_copy", "label": f"C{_ci+3}",
+                                   "x": _ec.get("x", 50), "y": _ec.get("y", 100),
+                                   "w": max(60, int(len(_ec["text"]) * _ecsz * 0.55)),
+                                   "h": int(_ecsz * 1.3)})
+
+    st.caption("🔴상품  🟢로고  🔵메인  🟣서브  🟡뱃지  🩵추가카피 — 요소를 직접 드래그·크기조절")
     drag_result = canvas_drag(canvas_img, drag_elements, CANVAS_W, CANVAS_H, 700, key="drag_canvas")
     if drag_result and st.session_state.drag_pending is None:
         st.session_state.drag_pending = drag_result
@@ -460,6 +540,7 @@ with tab_make:
         sub_y=layers["sub_text"]["y"],
         sub_copy_size=layers["sub_text"].get("size", 39),
         badges=st.session_state.badges,
+        extra_copies=st.session_state.extra_copies,
         show_guidelines=False,
     )
 
