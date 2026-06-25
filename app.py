@@ -89,6 +89,44 @@ if "badges" not in st.session_state:
     st.session_state.badges = []
 if "move_target" not in st.session_state:
     st.session_state.move_target = "— 선택 안 함 —"
+if "click_pending" not in st.session_state:
+    st.session_state.click_pending = None
+
+# ── Process canvas click BEFORE sidebar renders ───────────────────
+# (setting widget keys after render raises StreamlitAPIException)
+if st.session_state.click_pending is not None:
+    coords, target = st.session_state.click_pending
+    st.session_state.click_pending = None
+    _scale = CANVAS_W / 700
+    cx = min(int(coords["x"] * _scale), CANVAS_W - 1)
+    cy = min(int(coords["y"] * _scale), CANVAS_H - 1)
+    if target.startswith("상품 이미지 "):
+        idx = int(target.split()[-1]) - 1
+        if idx < len(st.session_state.product_images):
+            st.session_state.product_images[idx]["x"] = cx
+            st.session_state.product_images[idx]["y"] = cy
+            prods = st.session_state.layers.get("products", [])
+            if idx < len(prods):
+                prods[idx]["x"] = cx
+                prods[idx]["y"] = cy
+            st.session_state[f"prod_x_{idx}"] = cx
+            st.session_state[f"prod_y_{idx}"] = cy
+    elif target == "로고":
+        cx = min(cx, 200); cy = min(cy, 80)
+        st.session_state.layers["logo"]["x"] = cx
+        st.session_state.layers["logo"]["y"] = cy
+        st.session_state["logo_x"] = cx
+        st.session_state["logo_y"] = cy
+    elif target == "메인 카피":
+        st.session_state.layers["main_text"]["x"] = cx
+        st.session_state.layers["main_text"]["y"] = cy
+        st.session_state["main_x"] = cx
+        st.session_state["main_y"] = cy
+    elif target == "서브 카피":
+        st.session_state.layers["sub_text"]["x"] = cx
+        st.session_state.layers["sub_text"]["y"] = cy
+        st.session_state["sub_x"] = cx
+        st.session_state["sub_y"] = cy
 
 # ── Tabs ──────────────────────────────────────────────────────────
 tab_make, tab_projects = st.tabs(["🎨 제작", "📁 저장된 프로젝트"])
@@ -408,34 +446,9 @@ with tab_make:
         from streamlit_image_coordinates import streamlit_image_coordinates
         coords = streamlit_image_coordinates(canvas_img, key="canvas_click", width=PREVIEW_W)
         if coords and st.session_state.move_target != "— 선택 안 함 —":
-            cx = int(coords["x"] * scale)
-            cy = int(coords["y"] * scale)
-            target = st.session_state.move_target
-            if target.startswith("상품 이미지 "):
-                idx = int(target.split()[-1]) - 1
-                if idx < len(st.session_state.product_images):
-                    st.session_state.product_images[idx]["x"] = cx
-                    st.session_state.product_images[idx]["y"] = cy
-                    st.session_state.layers["products"][idx]["x"] = cx
-                    st.session_state.layers["products"][idx]["y"] = cy
-                    st.session_state[f"prod_x_{idx}"] = cx
-                    st.session_state[f"prod_y_{idx}"] = cy
-            elif target == "로고":
-                st.session_state.layers["logo"]["x"] = min(cx, 200)
-                st.session_state.layers["logo"]["y"] = min(cy, 80)
-                st.session_state["logo_x"] = min(cx, 200)
-                st.session_state["logo_y"] = min(cy, 80)
-            elif target == "메인 카피":
-                st.session_state.layers["main_text"]["x"] = cx
-                st.session_state.layers["main_text"]["y"] = cy
-                st.session_state["main_x"] = cx
-                st.session_state["main_y"] = cy
-            elif target == "서브 카피":
-                st.session_state.layers["sub_text"]["x"] = cx
-                st.session_state.layers["sub_text"]["y"] = cy
-                st.session_state["sub_x"] = cx
-                st.session_state["sub_y"] = cy
-            st.rerun()
+            if st.session_state.click_pending is None:
+                st.session_state.click_pending = (coords, st.session_state.move_target)
+                st.rerun()
     except ImportError:
         st.image(canvas_img, caption=f"미리보기 ({CANVAS_W}×{CANVAS_H}px)", width=PREVIEW_W)
 
