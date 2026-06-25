@@ -7,16 +7,39 @@ CANVAS_H = 258
 BG_COLOR = (0, 0, 0, 0)
 
 _FONT_DIR = Path(__file__).parent.parent / "assets" / "fonts"
-_FONT_BOLD = _FONT_DIR / "SpoqaHanSansBold.ttf"
-_FONT_REGULAR = _FONT_DIR / "SpoqaHanSansRegular.ttf"
+
+# Spoqa Han Sans
+_SPOQA_BOLD    = _FONT_DIR / "SpoqaHanSansBold.ttf"
+_SPOQA_REGULAR = _FONT_DIR / "SpoqaHanSansRegular.ttf"
+
+# Pretendard
+_PRETENDARD_BOLD    = _FONT_DIR / "PretendardBold.otf"
+_PRETENDARD_REGULAR = _FONT_DIR / "PretendardRegular.otf"
+
+FONT_FAMILIES = {
+    "Spoqa Han Sans": (_SPOQA_BOLD,    _SPOQA_REGULAR),
+    "Pretendard":     (_PRETENDARD_BOLD, _PRETENDARD_REGULAR),
+}
 
 DEFAULT_MAIN_SIZE = 48
-DEFAULT_SUB_SIZE = 39
-MAIN_COPY_COLOR = (76, 76, 76)
-SUB_COPY_COLOR = (119, 119, 119)
+DEFAULT_SUB_SIZE  = 39
+MAIN_COPY_COLOR   = (76,  76,  76)
+SUB_COPY_COLOR    = (119, 119, 119)
 
-SAFE_MARGIN = 20
+# 카카오 비즈보드 권장 텍스트 색상
+KAKAO_TEXT_COLORS = {
+    "기본 (#4C4C4C)":  (76,  76,  76),
+    "중간 (#555555)":  (85,  85,  85),
+    "연한 (#777777)":  (119, 119, 119),
+    "커스텀":          None,
+}
+
+SAFE_MARGIN    = 20
 GUIDELINE_COLOR = (190, 190, 190)
+
+
+def _font_paths(family: str) -> tuple:
+    return FONT_FAMILIES.get(family, FONT_FAMILIES["Spoqa Han Sans"])
 
 
 def _load_font(path: Path, size: int) -> ImageFont.FreeTypeFont:
@@ -28,7 +51,7 @@ def _load_font(path: Path, size: int) -> ImageFont.FreeTypeFont:
 def _paste_image(canvas: Image.Image, layer: Optional[Image.Image], x: int, y: int, scale: int) -> None:
     if layer is None:
         return
-    new_w = max(1, int(layer.width * scale / 100))
+    new_w = max(1, int(layer.width  * scale / 100))
     new_h = max(1, int(layer.height * scale / 100))
     resized = layer.resize((new_w, new_h), Image.LANCZOS)
     if resized.mode != "RGBA":
@@ -37,7 +60,6 @@ def _paste_image(canvas: Image.Image, layer: Optional[Image.Image], x: int, y: i
 
 
 def _draw_guidelines(canvas: Image.Image) -> Image.Image:
-    """Draw a subtle dashed safe-area rectangle on a copy of the canvas."""
     preview = canvas.copy()
     draw = ImageDraw.Draw(preview)
     m = SAFE_MARGIN
@@ -48,14 +70,12 @@ def _draw_guidelines(canvas: Image.Image) -> Image.Image:
     def draw_dashed_line(p1, p2):
         px, py = p1
         ex, ey = p2
-        dx = ex - px
-        dy = ey - py
+        dx, dy = ex - px, ey - py
         length = (dx**2 + dy**2) ** 0.5
         if length == 0:
             return
         ux, uy = dx / length, dy / length
-        pos = 0
-        drawing = True
+        pos, drawing = 0, True
         while pos < length:
             seg = dash_len if drawing else gap_len
             end_pos = min(pos + seg, length)
@@ -74,17 +94,12 @@ def _draw_guidelines(canvas: Image.Image) -> Image.Image:
     return preview
 
 
-def _draw_badge(draw: ImageDraw.ImageDraw, text: str, x: int, y: int,
-                font: ImageFont.FreeTypeFont, bg_color: tuple, text_color: tuple) -> None:
-    """Draw a pill-shaped badge with background color."""
+def _draw_badge(draw, text, x, y, font, bg_color, text_color):
     pad_x, pad_y = 10, 5
     bbox = font.getbbox(text)
-    tw = bbox[2] - bbox[0]
-    th = bbox[3] - bbox[1]
-    rx0, ry0 = x, y
-    rx1, ry1 = x + tw + pad_x * 2, y + th + pad_y * 2
-    draw.rounded_rectangle([rx0, ry0, rx1, ry1], radius=5, fill=bg_color)
-    draw.text((rx0 + pad_x, ry0 + pad_y - bbox[1]), text, font=font, fill=text_color)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    draw.rounded_rectangle([x, y, x + tw + pad_x*2, y + th + pad_y*2], radius=5, fill=bg_color)
+    draw.text((x + pad_x, y + pad_y - bbox[1]), text, font=font, fill=text_color)
 
 
 def render(
@@ -97,10 +112,14 @@ def render(
     main_x: int = 50,
     main_y: int = 70,
     main_copy_size: int = DEFAULT_MAIN_SIZE,
+    main_font_family: str = "Spoqa Han Sans",
+    main_color: tuple = MAIN_COPY_COLOR,
     sub_copy: str = "",
     sub_x: int = 50,
     sub_y: int = 155,
     sub_copy_size: int = DEFAULT_SUB_SIZE,
+    sub_font_family: str = "Spoqa Han Sans",
+    sub_color: tuple = SUB_COPY_COLOR,
     badges: Optional[list] = None,
     extra_copies: Optional[list] = None,
     show_guidelines: bool = False,
@@ -116,28 +135,30 @@ def render(
     draw = ImageDraw.Draw(canvas)
 
     if main_copy:
-        font = _load_font(_FONT_BOLD, main_copy_size)
-        draw.text((main_x, main_y), main_copy, font=font, fill=MAIN_COPY_COLOR)
+        bold_path, regular_path = _font_paths(main_font_family)
+        font = _load_font(bold_path, main_copy_size)
+        draw.text((main_x, main_y), main_copy, font=font, fill=main_color)
 
     if sub_copy:
-        font = _load_font(_FONT_REGULAR, sub_copy_size)
-        draw.text((sub_x, sub_y), sub_copy, font=font, fill=SUB_COPY_COLOR)
+        bold_path, regular_path = _font_paths(sub_font_family)
+        font = _load_font(regular_path, sub_copy_size)
+        draw.text((sub_x, sub_y), sub_copy, font=font, fill=sub_color)
 
     for ec in (extra_copies or []):
         if ec.get("enabled") and ec.get("text"):
-            _ec_font_path = _FONT_BOLD if ec.get("bold") else _FONT_REGULAR
-            ecfont = _load_font(_ec_font_path, ec.get("size", 36))
-            draw.text((ec.get("x", 50), ec.get("y", 100)), ec["text"], font=ecfont, fill=MAIN_COPY_COLOR)
+            bold_path, regular_path = _font_paths(ec.get("font_family", "Spoqa Han Sans"))
+            ec_path = bold_path if ec.get("bold") else regular_path
+            ecfont = _load_font(ec_path, ec.get("size", 36))
+            ec_color = tuple(ec.get("color", list(MAIN_COPY_COLOR)))
+            draw.text((ec.get("x", 50), ec.get("y", 100)), ec["text"], font=ecfont, fill=ec_color)
 
     for badge in (badges or []):
-        bfont = _load_font(_FONT_BOLD, badge.get("font_size", 28))
+        bfont = _load_font(_SPOQA_BOLD, badge.get("font_size", 28))
         _draw_badge(
-            draw,
-            badge["text"],
-            badge.get("x", 50),
-            badge.get("y", 100),
+            draw, badge["text"],
+            badge.get("x", 50), badge.get("y", 100),
             bfont,
-            tuple(badge.get("bg_color", (29, 158, 117))),
+            tuple(badge.get("bg_color",   (29, 158, 117))),
             tuple(badge.get("text_color", (255, 255, 255))),
         )
 

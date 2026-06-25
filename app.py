@@ -2,7 +2,7 @@ import io
 import streamlit as st
 from PIL import Image
 
-from modules.canvas import render, CANVAS_W, CANVAS_H
+from modules.canvas import render, CANVAS_W, CANVAS_H, FONT_FAMILIES, KAKAO_TEXT_COLORS
 from modules.bg_remover import remove_background
 from modules.templates import get_template, template_label_map, TEMPLATE_NAMES
 from modules.layer_controls import render_controls, render_extra_copy_controls
@@ -92,9 +92,17 @@ if "drag_pending" not in st.session_state:
     st.session_state.drag_pending = None
 if "extra_copies" not in st.session_state:
     st.session_state.extra_copies = [
-        {"enabled": False, "text": "", "x": 50, "y": 130, "size": 36, "bold": False},
+        {"enabled": False, "text": "", "x": 50,  "y": 130, "size": 36, "bold": False},
         {"enabled": False, "text": "", "x": 300, "y": 130, "size": 36, "bold": False},
+        {"enabled": False, "text": "", "x": 550, "y": 130, "size": 36, "bold": False},
+        {"enabled": False, "text": "", "x": 800, "y": 130, "size": 36, "bold": False},
     ]
+else:
+    # 기존 세션에 슬롯이 2개뿐이면 2개 추가
+    while len(st.session_state.extra_copies) < 4:
+        st.session_state.extra_copies.append(
+            {"enabled": False, "text": "", "x": 50, "y": 130, "size": 36, "bold": False}
+        )
 
 # ── Apply drag result BEFORE sidebar renders ──────────────────────
 # (widget key assignment after render raises StreamlitAPIException)
@@ -317,11 +325,34 @@ with tab_make:
 
         # ── Copy ──────────────────────────────────────────────────
         st.subheader("✏️ 카피")
+        _font_options = list(FONT_FAMILIES.keys())
+        _color_options = list(KAKAO_TEXT_COLORS.keys())
+
+        def _color_picker(label, key_preset, key_custom, default_color):
+            preset = st.selectbox(label, _color_options, key=key_preset)
+            if preset == "커스텀":
+                hex_default = "#{:02X}{:02X}{:02X}".format(*default_color)
+                picked = st.color_picker("색상 선택", value=hex_default, key=key_custom)
+                r, g, b = int(picked[1:3],16), int(picked[3:5],16), int(picked[5:7],16)
+                return (r, g, b)
+            return KAKAO_TEXT_COLORS[preset]
+
         st.text_input("메인 카피 (필수)", value=st.session_state.get("main_copy", ""), key="main_copy")
+        with st.expander("메인 카피 스타일", expanded=False):
+            st.selectbox("폰트", _font_options, key="main_font_family",
+                         index=_font_options.index(st.session_state.get("main_font_family", "Spoqa Han Sans")))
+            _main_color = _color_picker("색상", "main_color_preset", "main_color_custom", (76, 76, 76))
+            st.session_state["main_color"] = list(_main_color)
+
         st.text_input("서브 카피 (필수)", value=st.session_state.get("sub_copy", ""), key="sub_copy")
+        with st.expander("서브 카피 스타일", expanded=False):
+            st.selectbox("폰트", _font_options, key="sub_font_family",
+                         index=_font_options.index(st.session_state.get("sub_font_family", "Spoqa Han Sans")))
+            _sub_color = _color_picker("색상", "sub_color_preset", "sub_color_custom", (119, 119, 119))
+            st.session_state["sub_color"] = list(_sub_color)
 
         with st.expander("➕ 추가 카피 (선택)", expanded=False):
-            for _ci in range(2):
+            for _ci in range(len(st.session_state.extra_copies)):
                 _ec = st.session_state.extra_copies[_ci]
                 st.markdown(f"**카피 {_ci+3}**")
                 _enabled = st.checkbox("사용", value=_ec["enabled"], key=f"ec_{_ci}_enabled")
@@ -329,9 +360,14 @@ with tab_make:
                 if _enabled:
                     _txt = st.text_input("텍스트", value=_ec.get("text",""), key=f"ec_{_ci}_text")
                     st.session_state.extra_copies[_ci]["text"] = _txt
+                    _ec_font = st.selectbox("폰트", _font_options, key=f"ec_{_ci}_font",
+                                            index=_font_options.index(_ec.get("font_family","Spoqa Han Sans")))
+                    st.session_state.extra_copies[_ci]["font_family"] = _ec_font
+                    _ec_color = _color_picker("색상", f"ec_{_ci}_color_preset", f"ec_{_ci}_color_custom", (76, 76, 76))
+                    st.session_state.extra_copies[_ci]["color"] = list(_ec_color)
                     _bold = st.checkbox("볼드", value=_ec.get("bold", False), key=f"ec_{_ci}_bold")
                     st.session_state.extra_copies[_ci]["bold"] = _bold
-                if _ci == 0:
+                if _ci < len(st.session_state.extra_copies) - 1:
                     st.divider()
 
         st.divider()
@@ -454,6 +490,8 @@ with tab_make:
 
     # ── Canvas render ─────────────────────────────────────────────
     layers = st.session_state.layers
+    _main_color = tuple(st.session_state.get("main_color", [76, 76, 76]))
+    _sub_color  = tuple(st.session_state.get("sub_color",  [119, 119, 119]))
     canvas_img = render(
         product_images=st.session_state.product_images,
         logo_image=st.session_state.logo_image,
@@ -464,10 +502,14 @@ with tab_make:
         main_x=layers["main_text"]["x"],
         main_y=layers["main_text"]["y"],
         main_copy_size=layers["main_text"].get("size", 48),
+        main_font_family=st.session_state.get("main_font_family", "Spoqa Han Sans"),
+        main_color=_main_color,
         sub_copy=st.session_state.get("sub_copy", ""),
         sub_x=layers["sub_text"]["x"],
         sub_y=layers["sub_text"]["y"],
         sub_copy_size=layers["sub_text"].get("size", 39),
+        sub_font_family=st.session_state.get("sub_font_family", "Spoqa Han Sans"),
+        sub_color=_sub_color,
         badges=st.session_state.badges,
         extra_copies=st.session_state.extra_copies,
         show_guidelines=st.session_state.show_guidelines,
@@ -537,10 +579,14 @@ with tab_make:
         main_x=layers["main_text"]["x"],
         main_y=layers["main_text"]["y"],
         main_copy_size=layers["main_text"].get("size", 48),
+        main_font_family=st.session_state.get("main_font_family", "Spoqa Han Sans"),
+        main_color=_main_color,
         sub_copy=st.session_state.get("sub_copy", ""),
         sub_x=layers["sub_text"]["x"],
         sub_y=layers["sub_text"]["y"],
         sub_copy_size=layers["sub_text"].get("size", 39),
+        sub_font_family=st.session_state.get("sub_font_family", "Spoqa Han Sans"),
+        sub_color=_sub_color,
         badges=st.session_state.badges,
         extra_copies=st.session_state.extra_copies,
         show_guidelines=False,
