@@ -87,6 +87,8 @@ if "logo_upload_key" not in st.session_state:
     st.session_state.logo_upload_key = 0
 if "badges" not in st.session_state:
     st.session_state.badges = []
+if "move_target" not in st.session_state:
+    st.session_state.move_target = "— 선택 안 함 —"
 
 # ── Tabs ──────────────────────────────────────────────────────────
 tab_make, tab_projects = st.tabs(["🎨 제작", "📁 저장된 프로젝트"])
@@ -280,6 +282,19 @@ with tab_make:
                         st.session_state.layers["logo"] = preset["logo"]
                         st.session_state.layers["main_text"] = preset["main_text"]
                         st.session_state.layers["sub_text"] = preset["sub_text"]
+                        preset_prods = preset.get("products", [])
+                        cur_prods = st.session_state.layers.get("products", [])
+                        for i in range(len(cur_prods)):
+                            if i < len(preset_prods):
+                                cur_prods[i] = dict(preset_prods[i])
+                            elif preset_prods:
+                                last = preset_prods[-1]
+                                cur_prods[i] = {"x": min(last["x"] + (i - len(preset_prods) + 1) * 30, 950),
+                                                "y": last["y"], "scale": last["scale"]}
+                        st.session_state.layers["products"] = cur_prods
+                        for i, pos in enumerate(cur_prods):
+                            if i < len(st.session_state.product_images):
+                                st.session_state.product_images[i].update(pos)
                         _sync_sliders(st.session_state.layers, len(st.session_state.product_images))
                         st.rerun()
                 with col_del:
@@ -370,7 +385,62 @@ with tab_make:
         show_guidelines=st.session_state.show_guidelines,
     )
 
-    st.image(canvas_img, caption=f"미리보기 ({CANVAS_W}×{CANVAS_H}px)", width=700)
+    # ── Click-to-move ─────────────────────────────────────────────
+    move_options = ["— 선택 안 함 —"]
+    for i in range(len(st.session_state.product_images)):
+        move_options.append(f"상품 이미지 {i + 1}")
+    move_options += ["로고", "메인 카피", "서브 카피"]
+
+    col_move_label, col_move_sel = st.columns([2, 4])
+    with col_move_label:
+        st.caption("📍 클릭으로 이동할 요소")
+    with col_move_sel:
+        st.session_state.move_target = st.selectbox(
+            "이동할 요소", move_options,
+            index=move_options.index(st.session_state.move_target) if st.session_state.move_target in move_options else 0,
+            key="move_target_select", label_visibility="collapsed",
+        )
+
+    PREVIEW_W = 700
+    scale = CANVAS_W / PREVIEW_W
+
+    try:
+        from streamlit_image_coordinates import streamlit_image_coordinates
+        coords = streamlit_image_coordinates(canvas_img, key="canvas_click", width=PREVIEW_W)
+        if coords and st.session_state.move_target != "— 선택 안 함 —":
+            cx = int(coords["x"] * scale)
+            cy = int(coords["y"] * scale)
+            target = st.session_state.move_target
+            if target.startswith("상품 이미지 "):
+                idx = int(target.split()[-1]) - 1
+                if idx < len(st.session_state.product_images):
+                    st.session_state.product_images[idx]["x"] = cx
+                    st.session_state.product_images[idx]["y"] = cy
+                    st.session_state.layers["products"][idx]["x"] = cx
+                    st.session_state.layers["products"][idx]["y"] = cy
+                    st.session_state[f"prod_x_{idx}"] = cx
+                    st.session_state[f"prod_y_{idx}"] = cy
+            elif target == "로고":
+                st.session_state.layers["logo"]["x"] = min(cx, 200)
+                st.session_state.layers["logo"]["y"] = min(cy, 80)
+                st.session_state["logo_x"] = min(cx, 200)
+                st.session_state["logo_y"] = min(cy, 80)
+            elif target == "메인 카피":
+                st.session_state.layers["main_text"]["x"] = cx
+                st.session_state.layers["main_text"]["y"] = cy
+                st.session_state["main_x"] = cx
+                st.session_state["main_y"] = cy
+            elif target == "서브 카피":
+                st.session_state.layers["sub_text"]["x"] = cx
+                st.session_state.layers["sub_text"]["y"] = cy
+                st.session_state["sub_x"] = cx
+                st.session_state["sub_y"] = cy
+            st.rerun()
+    except ImportError:
+        st.image(canvas_img, caption=f"미리보기 ({CANVAS_W}×{CANVAS_H}px)", width=PREVIEW_W)
+
+    if st.session_state.move_target != "— 선택 안 함 —":
+        st.caption(f"💡 캔버스를 클릭하면 **{st.session_state.move_target}**이(가) 해당 위치로 이동합니다.")
 
     # Download (always without guidelines)
     download_img = render(

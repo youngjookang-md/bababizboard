@@ -11,6 +11,7 @@ def save_preset(name: str, layers: dict) -> None:
         "logo": dict(layers["logo"]),
         "main_text": dict(layers["main_text"]),
         "sub_text": dict(layers["sub_text"]),
+        "products": [dict(p) for p in layers.get("products", [])],
     }
     path = PRESETS_DIR / f"{name}.json"
     with open(path, "w", encoding="utf-8") as f:
