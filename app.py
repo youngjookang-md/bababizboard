@@ -124,6 +124,11 @@ if st.session_state.drag_pending is not None:
         st.session_state.layers["sub_text"]["y"] = _y
         st.session_state["sub_x"] = _x
         st.session_state["sub_y"] = _y
+    elif _id.startswith("badge_"):
+        _i = int(_id.split("_")[1])
+        if _i < len(st.session_state.badges):
+            st.session_state.badges[_i]["x"] = _x
+            st.session_state.badges[_i]["y"] = _y
 
 # ── Tabs ──────────────────────────────────────────────────────────
 tab_make, tab_projects = st.tabs(["🎨 제작", "📁 저장된 프로젝트"])
@@ -430,8 +435,10 @@ with tab_make:
     drag_elements.append({"id": "logo",      "type": "logo",      "label": "L", "x": layers["logo"]["x"],      "y": layers["logo"]["y"]})
     drag_elements.append({"id": "main_text", "type": "main_text", "label": "M", "x": layers["main_text"]["x"],  "y": layers["main_text"]["y"]})
     drag_elements.append({"id": "sub_text",  "type": "sub_text",  "label": "S", "x": layers["sub_text"]["x"],   "y": layers["sub_text"]["y"]})
+    for _bi, _badge in enumerate(st.session_state.badges):
+        drag_elements.append({"id": f"badge_{_bi}", "type": "badge", "label": f"B{_bi+1}", "x": _badge["x"], "y": _badge["y"]})
 
-    st.caption("🔴상품  🟢로고  🔵메인카피  🟣서브카피 — 핸들을 드래그해서 이동하세요")
+    st.caption("🔴상품  🟢로고  🔵메인카피  🟣서브카피  🟡뱃지 — 핸들을 드래그해서 이동하세요")
     drag_result = canvas_drag(canvas_img, drag_elements, CANVAS_W, CANVAS_H, 700, key="drag_canvas")
     if drag_result and st.session_state.drag_pending is None:
         st.session_state.drag_pending = drag_result
