@@ -4,7 +4,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 CANVAS_W = 1029
 CANVAS_H = 258
-BG_COLOR = (255, 255, 255)
+BG_COLOR = (0, 0, 0, 0)
 
 _FONT_DIR = Path(__file__).parent.parent / "assets" / "fonts"
 _FONT_BOLD = _FONT_DIR / "SpoqaHanSansBold.ttf"
@@ -31,10 +31,9 @@ def _paste_image(canvas: Image.Image, layer: Optional[Image.Image], x: int, y: i
     new_w = max(1, int(layer.width * scale / 100))
     new_h = max(1, int(layer.height * scale / 100))
     resized = layer.resize((new_w, new_h), Image.LANCZOS)
-    if resized.mode == "RGBA":
-        canvas.paste(resized, (x, y), resized)
-    else:
-        canvas.paste(resized, (x, y))
+    if resized.mode != "RGBA":
+        resized = resized.convert("RGBA")
+    canvas.paste(resized, (x, y), resized)
 
 
 def _draw_guidelines(canvas: Image.Image) -> Image.Image:
@@ -106,7 +105,7 @@ def render(
     extra_copies: Optional[list] = None,
     show_guidelines: bool = False,
 ) -> Image.Image:
-    canvas = Image.new("RGB", (CANVAS_W, CANVAS_H), BG_COLOR)
+    canvas = Image.new("RGBA", (CANVAS_W, CANVAS_H), BG_COLOR)
 
     if product_images:
         for item in product_images:
