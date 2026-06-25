@@ -126,7 +126,8 @@ def render(
 
     for ec in (extra_copies or []):
         if ec.get("enabled") and ec.get("text"):
-            ecfont = _load_font(_FONT_REGULAR, ec.get("size", 36))
+            _ec_font_path = _FONT_BOLD if ec.get("bold") else _FONT_REGULAR
+            ecfont = _load_font(_ec_font_path, ec.get("size", 36))
             draw.text((ec.get("x", 50), ec.get("y", 100)), ec["text"], font=ecfont, fill=MAIN_COPY_COLOR)
 
     for badge in (badges or []):

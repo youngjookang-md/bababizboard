@@ -92,8 +92,8 @@ if "drag_pending" not in st.session_state:
     st.session_state.drag_pending = None
 if "extra_copies" not in st.session_state:
     st.session_state.extra_copies = [
-        {"enabled": False, "text": "", "x": 50, "y": 130, "size": 36},
-        {"enabled": False, "text": "", "x": 300, "y": 130, "size": 36},
+        {"enabled": False, "text": "", "x": 50, "y": 130, "size": 36, "bold": False},
+        {"enabled": False, "text": "", "x": 300, "y": 130, "size": 36, "bold": False},
     ]
 
 # ── Apply drag result BEFORE sidebar renders ──────────────────────
@@ -329,6 +329,8 @@ with tab_make:
                 if _enabled:
                     _txt = st.text_input("텍스트", value=_ec.get("text",""), key=f"ec_{_ci}_text")
                     st.session_state.extra_copies[_ci]["text"] = _txt
+                    _bold = st.checkbox("볼드", value=_ec.get("bold", False), key=f"ec_{_ci}_bold")
+                    st.session_state.extra_copies[_ci]["bold"] = _bold
                 if _ci == 0:
                     st.divider()
 
