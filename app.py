@@ -37,6 +37,29 @@ def _default_layers(template_name: str) -> dict:
     }
 
 
+def _add_product_image(img: Image.Image, apply_rembg: bool) -> None:
+    """Add a product image to session state, optionally removing background."""
+    if apply_rembg:
+        with st.spinner("배경 제거 중..."):
+            try:
+                img = remove_background(img)
+            except Exception as e:
+                st.warning(f"배경 제거 실패, 원본 이미지로 추가합니다. ({e})")
+
+    dp = get_template(st.session_state.template)["default_product"]
+    offset = len(st.session_state.product_images) * 30
+    st.session_state.product_images.append({
+        "image": img,
+        "x": min(dp["x"] + offset, 950),
+        "y": min(dp["y"] + offset, 230),
+        "scale": dp["scale"],
+    })
+    st.session_state.layers["products"] = [
+        {"x": p["x"], "y": p["y"], "scale": p["scale"]}
+        for p in st.session_state.product_images
+    ]
+
+
 # ── Session state init ────────────────────────────────────────────
 if "template" not in st.session_state:
     st.session_state.template = "right_image"
@@ -48,6 +71,10 @@ if "layers" not in st.session_state:
     st.session_state.layers = _default_layers("right_image")
 if "show_guidelines" not in st.session_state:
     st.session_state.show_guidelines = True
+if "product_upload_key" not in st.session_state:
+    st.session_state.product_upload_key = 0
+if "logo_upload_key" not in st.session_state:
+    st.session_state.logo_upload_key = 0
 
 # ── Tabs ──────────────────────────────────────────────────────────
 tab_make, tab_projects = st.tabs(["🎨 제작", "📁 저장된 프로젝트"])
@@ -117,66 +144,41 @@ with tab_make:
     with st.sidebar:
         st.header("소재 설정")
 
-        # Product images
+        # ── Product images ────────────────────────────────────────
         st.subheader("📷 상품 이미지")
 
-        try:
-            from streamlit_paste_button import paste_image_button as pbutton
-            paste_result = pbutton("📋 클립보드에서 붙여넣기", key="paste_btn")
-            if paste_result.image_data is not None:
-                pasted = paste_result.image_data.convert("RGBA")
-                dp = get_template(st.session_state.template)["default_product"]
-                offset = len(st.session_state.product_images) * 30
-                st.session_state.product_images.append({
-                    "image": pasted,
-                    "x": min(dp["x"] + offset, 950),
-                    "y": min(dp["y"] + offset, 230),
-                    "scale": dp["scale"],
-                })
-                st.session_state.layers["products"] = [
-                    {"x": p["x"], "y": p["y"], "scale": p["scale"]}
-                    for p in st.session_state.product_images
-                ]
-                st.rerun()
-        except ImportError:
-            st.info("pip install streamlit-paste-button")
+        auto_rembg = st.checkbox("업로드 시 자동 배경 제거 (누끼)", key="auto_rembg")
 
-        uploaded_file = st.file_uploader("파일 업로드", type=["png", "jpg", "jpeg"], key="product_upload")
-        if uploaded_file:
+        # File uploader — key rotates after each successful add to reset widget
+        uploaded_file = st.file_uploader(
+            "이미지 업로드 (PNG/JPG)",
+            type=["png", "jpg", "jpeg"],
+            key=f"product_upload_{st.session_state.product_upload_key}",
+            help="파일을 드래그하거나 클릭해서 업로드하세요.",
+        )
+
+        if uploaded_file is not None:
             raw = Image.open(uploaded_file).convert("RGBA")
-            col_a, col_b = st.columns(2)
-            with col_a:
-                if st.button("그대로 추가", key="add_raw"):
-                    dp = get_template(st.session_state.template)["default_product"]
-                    offset = len(st.session_state.product_images) * 30
-                    st.session_state.product_images.append({
-                        "image": raw,
-                        "x": min(dp["x"] + offset, 950),
-                        "y": min(dp["y"] + offset, 230),
-                        "scale": dp["scale"],
-                    })
-                    st.session_state.layers["products"] = [
-                        {"x": p["x"], "y": p["y"], "scale": p["scale"]}
-                        for p in st.session_state.product_images
-                    ]
+            st.image(raw, width=120, caption="업로드된 이미지")
+            if st.button("✅ 추가", key="btn_add_product", use_container_width=True):
+                _add_product_image(raw, auto_rembg)
+                st.session_state.product_upload_key += 1  # reset uploader
+                st.rerun()
+
+        # Clipboard paste (optional — requires browser support)
+        with st.expander("📋 클립보드에서 붙여넣기", expanded=False):
+            st.caption("Chrome/Edge에서만 지원됩니다.")
+            try:
+                from streamlit_paste_button import paste_image_button as pbutton
+                paste_result = pbutton("클립보드 이미지 붙여넣기", key="paste_btn")
+                if paste_result.image_data is not None:
+                    pasted = paste_result.image_data.convert("RGBA")
+                    _add_product_image(pasted, auto_rembg)
                     st.rerun()
-            with col_b:
-                if st.button("누끼 후 추가", key="add_rembg"):
-                    with st.spinner("배경 제거 중..."):
-                        result = remove_background(raw)
-                    dp = get_template(st.session_state.template)["default_product"]
-                    offset = len(st.session_state.product_images) * 30
-                    st.session_state.product_images.append({
-                        "image": result,
-                        "x": min(dp["x"] + offset, 950),
-                        "y": min(dp["y"] + offset, 230),
-                        "scale": dp["scale"],
-                    })
-                    st.session_state.layers["products"] = [
-                        {"x": p["x"], "y": p["y"], "scale": p["scale"]}
-                        for p in st.session_state.product_images
-                    ]
-                    st.rerun()
+            except ImportError:
+                st.info("streamlit-paste-button 패키지가 없습니다.")
+            except Exception as e:
+                st.warning(f"붙여넣기를 사용할 수 없습니다: {e}")
 
         # Thumbnail list
         if st.session_state.product_images:
@@ -198,30 +200,46 @@ with tab_make:
 
         st.divider()
 
-        # Logo
+        # ── Logo ──────────────────────────────────────────────────
         st.subheader("🖼 로고")
-        logo_file = st.file_uploader("로고 업로드", type=["png", "jpg", "jpeg"], key="logo_upload")
-        if logo_file:
+        logo_rembg = st.checkbox("업로드 시 배경 제거", key="logo_rembg_check")
+        logo_file = st.file_uploader(
+            "로고 업로드",
+            type=["png", "jpg", "jpeg"],
+            key=f"logo_upload_{st.session_state.logo_upload_key}",
+        )
+        if logo_file is not None:
             raw_logo = Image.open(logo_file).convert("RGBA")
-            remove_logo_bg = st.checkbox("로고 배경 제거", key="logo_rembg_check")
-            if remove_logo_bg and st.button("누끼 실행", key="logo_rembg_btn"):
-                with st.spinner("배경 제거 중..."):
-                    st.session_state.logo_image = remove_background(raw_logo)
-                st.success("완료!")
-            else:
-                if st.session_state.logo_image is None:
+            st.image(raw_logo, width=80, caption="업로드된 로고")
+            if st.button("✅ 로고 적용", key="btn_add_logo", use_container_width=True):
+                if logo_rembg:
+                    with st.spinner("배경 제거 중..."):
+                        try:
+                            st.session_state.logo_image = remove_background(raw_logo)
+                        except Exception as e:
+                            st.warning(f"배경 제거 실패: {e}")
+                            st.session_state.logo_image = raw_logo
+                else:
                     st.session_state.logo_image = raw_logo
+                st.session_state.logo_upload_key += 1  # reset uploader
+                st.rerun()
+
+        if st.session_state.logo_image is not None:
+            st.image(st.session_state.logo_image, width=80, caption="현재 로고")
+            if st.button("로고 제거", key="btn_del_logo"):
+                st.session_state.logo_image = None
+                st.rerun()
 
         st.divider()
 
-        # Copy
+        # ── Copy ──────────────────────────────────────────────────
         st.subheader("✏️ 카피")
         st.text_input("메인 카피", value=st.session_state.get("main_copy", ""), key="main_copy")
         st.text_input("서브 카피", value=st.session_state.get("sub_copy", ""), key="sub_copy")
 
         st.divider()
 
-        # Layer controls
+        # ── Layer controls ────────────────────────────────────────
         num_products = len(st.session_state.product_images)
         updated_layers = render_controls(st.session_state.layers, num_products)
 
@@ -257,7 +275,6 @@ with tab_make:
         show_guidelines=st.session_state.show_guidelines,
     )
 
-    # Preview: fixed width for compact display
     st.image(canvas_img, caption=f"미리보기 ({CANVAS_W}×{CANVAS_H}px)", width=700)
 
     # Download (always without guidelines)
